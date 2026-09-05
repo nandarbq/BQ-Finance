@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { Wallet, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
+import logoUrl from "../assets/bq-logo-full.png";
 
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
@@ -72,9 +73,9 @@ export default function AuthGate({ children }) {
           <div className="flex flex-col items-center mb-6">
             <div
               className="flex items-center justify-center mb-3"
-              style={{ width: 56, height: 56, borderRadius: 18, background: "var(--bg-surface)" }}
+              style={{ width: 88, height: 88, borderRadius: 22, overflow: "hidden", background: "var(--bg-surface)" }}
             >
-              <Wallet size={24} color="var(--blue)" />
+              <img src={logoUrl} alt="BQ Finance" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             </div>
             <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 22 }}>
               BQ <span style={{ color: "var(--blue)" }}>Finance</span>

@@ -17,6 +17,7 @@ import {
   fetchMembers, insertMember, deleteMemberById,
 } from "../lib/financeApi";
 import { exportTransactionPdf } from "../lib/exportPdf";
+import defaultRobotAvatar from "../assets/avatar robot bq finance.png";
 
 /* ----------------------------- Konstanta & util ---------------------------- */
 
@@ -178,7 +179,7 @@ function ProfileAvatar({ avatar, size = 36, innerId = "sb" }) {
   if (avatar) {
     return <img src={avatar} alt="Foto profil" referrerPolicy="no-referrer" style={{ ...style, objectFit: "cover" }} />;
   }
-  return <RobotAvatar size={size} innerId={innerId} />;
+  return <img src={defaultRobotAvatar} alt="Avatar robot BQ Finance" style={{ ...style, objectFit: "contain", objectPosition: "center" }} />;
 }
 
 function CropSheet({ src, onClose, onConfirm }) {
@@ -489,12 +490,12 @@ const grouped = useMemo(() => {
     return formatDateShort(startDate) + " - " + formatDateShort(endDate);
   }
 
-  function handleExportPdf() {
+  async function handleExportPdf() {
     if (filtered.length === 0) {
       alert("Tidak ada transaksi untuk diekspor. Periksa kembali periode dan filter.");
       return;
     }
-    exportTransactionPdf({
+    await exportTransactionPdf({
       transactions: filtered,
       members,
       mode,
@@ -1065,7 +1066,7 @@ return (
               <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 19, letterSpacing: "-0.01em" }}>
                 BQ <span style={{ color: "var(--blue)" }}>Finance</span>
               </p>
-<p style={{ color: "var(--text-muted)", fontSize: 10.5, marginTop: -2 }}>Catat uangmu tanpa ribet</p>
+              <p style={{ color: "var(--text-muted)", fontSize: 10.5, marginTop: -2 }}>Catat uangmu tanpa ribet</p>
             </div>
             <button onClick={() => setProfileOpen(true)} aria-label="Buka profil" className="transition-transform active:scale-90 flex items-center gap-2 flex-shrink-0" style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}>
               <span className="truncate text-right" style={{ maxWidth: 100, color: "var(--text-primary)", fontSize: 13, fontWeight: 600 }}>{displayName}</span>

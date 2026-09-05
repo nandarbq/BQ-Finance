@@ -1,5 +1,23 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
+import logoUrl from "../assets/bq-logo-full.png";
+
+let logoDataUrlPromise;
+
+function getLogoDataUrl() {
+  if (!logoDataUrlPromise) {
+    logoDataUrlPromise = fetch(logoUrl)
+      .then((response) => response.blob())
+      .then((blob) => new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      }))
+      .catch(() => null);
+  }
+  return logoDataUrlPromise;
+}
 
 const CAT_LABELS = {
   in: {
@@ -43,11 +61,12 @@ function formatAmount(type, n) {
   return (type === "in" ? "+" : "-") + rupiah(n);
 }
 
-export function exportTransactionPdf({ transactions, members, mode = "pribadi", periodLabel = "", displayName = "" }) {
+export async function exportTransactionPdf({ transactions, members, mode = "pribadi", periodLabel = "", displayName = "" }) {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const marginX = 42;
+  const logoDataUrl = await getLogoDataUrl();
 
   const memberName = (id) => {
     const m = members.find((x) => x.id === id);
@@ -67,17 +86,14 @@ export function exportTransactionPdf({ transactions, members, mode = "pribadi", 
   doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2]);
   doc.rect(0, 0, pageW, 7, "F");
 
-  doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2]);
-  doc.roundedRect(marginX, 32, 30, 30, 8, 8, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text("BQ", marginX + 15, 51, { align: "center" });
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, "PNG", marginX, 24, 48, 48);
+  }
 
   doc.setTextColor(ACCENT[0], ACCENT[1], ACCENT[2]);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text("BQ Finance", marginX + 42, 52);
+  doc.text("BQ Finance", marginX + 60, 52);
 
   doc.setTextColor(INK[0], INK[1], INK[2]);
   doc.setFont("helvetica", "bold");
