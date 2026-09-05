@@ -946,6 +946,8 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("bq_finance_theme", theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", theme === "dark" ? "#121212" : "#ffffff");
   }, [theme]);
 
   useEffect(() => {
@@ -1092,7 +1094,7 @@ return (
       `}</style>
 
       <div className="bqfinance-shell relative w-full flex flex-col overflow-hidden" style={{ background: "var(--bg-app)" }}>
-<div className="px-4 pt-3 pb-2 flex-shrink-0">
+<div className="px-4 pt-3 pb-2 flex-shrink-0" style={{ paddingTop: "calc(0.75rem + env(safe-area-inset-top))" }}>
 <div className="flex items-center justify-between mb-3">
             <div>
               <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 19, letterSpacing: "-0.01em" }}>
