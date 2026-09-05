@@ -45,41 +45,41 @@ export default function AuthGate({ children }) {
 
   if (checking) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "#05100D" }}>
-        <span style={{ color: "#7A8279", fontSize: 12, fontFamily: "Inter, sans-serif" }}>Memuat...</span>
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
+        <span style={{ color: "var(--text-muted)", fontSize: 12, fontFamily: "Inter, sans-serif" }}>Memuat...</span>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center px-5" style={{ background: "#05100D" }}>
+      <div className="min-h-screen w-full flex items-center justify-center px-5" style={{ background: "var(--bg-page)" }}>
         <div className="w-full" style={{ maxWidth: 360 }}>
           <div className="flex flex-col items-center mb-6">
             <div
               className="flex items-center justify-center mb-3"
-              style={{ width: 56, height: 56, borderRadius: 18, background: "#161F1B" }}
+              style={{ width: 56, height: 56, borderRadius: 18, background: "var(--bg-surface)" }}
             >
-              <Wallet size={24} color="#C9A44C" />
+              <Wallet size={24} color="var(--blue)" />
             </div>
-            <p style={{ fontFamily: "'Sora', sans-serif", color: "#F5F2E9", fontWeight: 800, fontSize: 22 }}>
-              Ares<span style={{ color: "#C9A44C" }}>Ku</span>
+            <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 22 }}>
+              BQ <span style={{ color: "var(--blue)" }}>Finance</span>
             </p>
-            <p style={{ color: "#7A8279", fontSize: 12, marginTop: 2 }}>Catat uangmu tanpa ribet</p>
+            <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 2 }}>Catat uangmu tanpa ribet</p>
           </div>
 
-          <div className="flex rounded-xl p-1 mb-4" style={{ background: "#161F1B" }}>
+          <div className="flex rounded-xl p-1 mb-4" style={{ background: "var(--bg-surface)" }}>
             <button
               onClick={() => setMode("signin")}
               className="flex-1 py-2 rounded-lg"
-              style={{ background: mode === "signin" ? "#232E29" : "transparent", color: mode === "signin" ? "#F2EFE6" : "#7A8279", fontSize: 12.5, fontWeight: 600 }}
+              style={{ background: mode === "signin" ? "var(--bg-selected)" : "transparent", color: mode === "signin" ? "var(--text-primary)" : "var(--text-muted)", fontSize: 12.5, fontWeight: 600 }}
             >
               Masuk
             </button>
             <button
               onClick={() => setMode("signup")}
               className="flex-1 py-2 rounded-lg"
-              style={{ background: mode === "signup" ? "#232E29" : "transparent", color: mode === "signup" ? "#F2EFE6" : "#7A8279", fontSize: 12.5, fontWeight: 600 }}
+              style={{ background: mode === "signup" ? "var(--bg-selected)" : "transparent", color: mode === "signup" ? "var(--text-primary)" : "var(--text-muted)", fontSize: 12.5, fontWeight: 600 }}
             >
               Daftar
             </button>
@@ -92,7 +92,7 @@ export default function AuthGate({ children }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
               className="w-full px-3.5 py-3 rounded-xl outline-none"
-              style={{ background: "#161F1B", color: "#F2EFE6", fontSize: 13, border: "1px solid #232E29" }}
+              style={{ background: "var(--bg-surface)", color: "var(--text-primary)", fontSize: 13, border: "1px solid var(--bg-selected)" }}
             />
             <input
               type="password"
@@ -100,15 +100,15 @@ export default function AuthGate({ children }) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Kata sandi"
               className="w-full px-3.5 py-3 rounded-xl outline-none"
-              style={{ background: "#161F1B", color: "#F2EFE6", fontSize: 13, border: "1px solid #232E29" }}
+              style={{ background: "var(--bg-surface)", color: "var(--text-primary)", fontSize: 13, border: "1px solid var(--bg-selected)" }}
             />
-            {error && <p style={{ color: "#E17B5D", fontSize: 11.5 }}>{error}</p>}
-            {info && <p style={{ color: "#5FBF8F", fontSize: 11.5 }}>{info}</p>}
+            {error && <p style={{ color: "var(--negative)", fontSize: 11.5 }}>{error}</p>}
+            {info && <p style={{ color: "var(--positive)", fontSize: 11.5 }}>{info}</p>}
             <button
               type="submit"
               disabled={submitting}
               className="w-full py-3 rounded-xl mt-1"
-              style={{ background: "#C9A44C", color: "#101614", fontSize: 13, fontWeight: 700, opacity: submitting ? 0.7 : 1 }}
+              style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700, opacity: submitting ? 0.7 : 1 }}
             >
               {mode === "signin" ? "Masuk" : "Buat akun"}
             </button>
