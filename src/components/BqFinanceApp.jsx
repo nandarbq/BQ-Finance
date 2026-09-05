@@ -1075,7 +1075,7 @@ async function handleSignOut() {
   }
 
 return (
-    <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
+    <div className="bqfinance-page min-h-screen w-full flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
       <style>{`
         .bqfinance-blob { position: absolute; border-radius: 999px; filter: blur(30px); opacity: 0.35; pointer-events: none; }
         .bqfinance-blob-a { width: 160px; height: 160px; background: var(--blue); top: -60px; right: -40px; animation: bqfinance-float-a 9s ease-in-out infinite; }

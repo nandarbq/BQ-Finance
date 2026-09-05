@@ -13,7 +13,7 @@ export default defineConfig({
         short_name: "BQ Finance",
         description: "Aplikasi manajemen keuangan pribadi dan keluarga tanpa ribet.",
         start_url: "/",
-        display: "standalone",
+        display: "fullscreen",
         background_color: "#ffffff",
         theme_color: "#ffffff",
         orientation: "portrait",
