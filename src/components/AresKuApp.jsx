@@ -381,14 +381,17 @@ function TabGrafik({ modeTx }) {
   const curKey = monthKeyFor(offset);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
 
-  const catBreakdown = useMemo(() => {
+const catBreakdown = useMemo(() => {
     const map = {};
-    monthTx.filter((t) => t.type === "out").forEach((t) => { map[t.category] = (map[t.category] || 0) + t.amount; });
+    monthTx.forEach((t) => {
+      map[t.category] = map[t.category] || { val: 0, type: t.type };
+      map[t.category].val += t.amount;
+    });
     return Object.entries(map)
-      .map(([catId, val]) => { const meta = getCatMeta("out", catId); return { name: meta.label, value: val, color: meta.color }; })
+      .map(([catId, data]) => { const meta = getCatMeta(data.type, catId); return { name: meta.label, value: data.val, type: data.type, color: meta.color }; })
       .sort((a, b) => b.value - a.value);
   }, [monthTx]);
-  const totalExpenseMonth = catBreakdown.reduce((s, c) => s + c.value, 0);
+  const totalMonth = catBreakdown.reduce((s, c) => s + c.value, 0);
 
   const weekData = useMemo(() => {
     const days = [];
@@ -412,9 +415,9 @@ function TabGrafik({ modeTx }) {
       </div>
 
       <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
-        <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }} className="mb-2">Pengeluaran per kategori</p>
+<p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }} className="mb-2">Pemasukan & pengeluaran per kategori</p>
         {catBreakdown.length === 0 ? (
-          <EmptyState icon={PieIcon} title="Tidak ada data" subtitle="Belum ada pengeluaran tercatat pada bulan ini." />
+          <EmptyState icon={PieIcon} title="Tidak ada data" subtitle="Belum ada transaksi tercatat pada bulan ini." />
         ) : (
           <>
             <div style={{ width: "100%", height: 170 }}>
@@ -429,13 +432,14 @@ function TabGrafik({ modeTx }) {
             </div>
             <div className="flex flex-col gap-1.5 mt-2">
               {catBreakdown.map((c, i) => (
-                <div key={i} className="flex items-center justify-between">
+<div key={i} className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <div style={{ width: 7, height: 7, borderRadius: 99, background: c.color }} />
+                    <span style={{ color: c.type === "in" ? "var(--positive)" : "var(--negative)", fontSize: 11 }}>{c.type === "in" ? "+" : "-"}</span>
                     <span style={{ color: "var(--text-secondary)", fontSize: 11.5 }}>{c.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span style={{ color: "var(--text-muted)", fontSize: 10.5 }}>{totalExpenseMonth ? Math.round((c.value / totalExpenseMonth) * 100) : 0}%</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 10.5 }}>{totalMonth ? Math.round((c.value / totalMonth) * 100) : 0}%</span>
                     <span style={{ color: "var(--text-primary)", fontSize: 11.5, fontWeight: 600 }}>{formatRupiah(c.value)}</span>
                   </div>
                 </div>
@@ -672,9 +676,8 @@ export default function AresKuApp({ session }) {
   const [transactions, setTransactions] = useState([]);
   const [members, setMembers] = useState([]);
   const [activeTab, setActiveTab] = useState("beranda");
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
+const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [clock, setClock] = useState(new Date());
   const [loadError, setLoadError] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("bq_finance_theme") || "light");
 
@@ -700,12 +703,7 @@ export default function AresKuApp({ session }) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("bq_finance_theme", theme);
   }, [theme]);
-  useEffect(() => {
-    const t = setInterval(() => setClock(new Date()), 30000);
-    return () => clearInterval(t);
-  }, []);
-
-  const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [transactions, mode]);
+const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [transactions, mode]);
 
   const handleSaveTransaction = useCallback(async (draft) => {
     setSaving(true);
@@ -777,9 +775,7 @@ export default function AresKuApp({ session }) {
     await supabase.auth.signOut();
   }
 
-  const timeStr = clock.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
-
-  return (
+return (
     <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
       <style>{`
         .aresku-blob { position: absolute; border-radius: 999px; filter: blur(30px); opacity: 0.35; pointer-events: none; }
@@ -799,16 +795,7 @@ export default function AresKuApp({ session }) {
       `}</style>
 
       <div className="relative w-full flex flex-col overflow-hidden" style={{ maxWidth: 428, height: "100vh", maxHeight: 926, background: "var(--bg-app)", borderRadius: 34, boxShadow: "0 30px 90px rgba(0,0,0,0.55)" }}>
-        <div className="flex items-center justify-between px-6 pt-3 pb-1 flex-shrink-0">
-          <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600, fontFamily: "'Sora', sans-serif" }}>{timeStr}</span>
-          <div className="flex items-center gap-1">
-            <div style={{ width: 3, height: 3, borderRadius: 99, background: "var(--text-primary)" }} />
-            <div style={{ width: 3, height: 3, borderRadius: 99, background: "var(--text-primary)" }} />
-            <div style={{ width: 3, height: 3, borderRadius: 99, background: "var(--text-primary)" }} />
-          </div>
-        </div>
-
-        <div className="px-4 pt-1 pb-2 flex-shrink-0">
+<div className="px-4 pt-3 pb-2 flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <div>
               <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 19, letterSpacing: "-0.01em" }}>
