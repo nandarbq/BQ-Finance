@@ -14,7 +14,7 @@ export default defineConfig({
         description: "Aplikasi manajemen keuangan pribadi dan keluarga tanpa ribet.",
         start_url: "/",
         display: "standalone",
-        background_color: "#121212",
+        background_color: "#ffffff",
         theme_color: "#ffffff",
         orientation: "portrait",
         icons: [
