@@ -1,4 +1,4 @@
-# AresKu
+# BQ Finance
 
 Aplikasi pencatatan keuangan pribadi & keluarga. Input cepat (nominal + kategori saja yang wajib), mode Pribadi dan Keluarga terpisah, grafik pengeluaran, dan multi-pengguna lewat login Supabase.
 
@@ -30,9 +30,9 @@ Buka `http://localhost:5173`, daftar akun baru, dan mulai coba catat transaksi.
 **Opsi tercepat: Vercel**
 
 1. Push folder ini ke repository GitHub.
-2. Buka [vercel.com](https://vercel.com) → **Add New Project** → pilih repo tadi.
+2. Buka [vercel.com](https://vercel.com) Ã¢â€ â€™ **Add New Project** Ã¢â€ â€™ pilih repo tadi.
 3. Saat diminta Environment Variables, isi `VITE_SUPABASE_URL` dan `VITE_SUPABASE_ANON_KEY` dengan nilai yang sama dari `.env`.
-4. Klik **Deploy**. Beres — dapat URL `https://nama-project.vercel.app` yang bisa dibuka dan di-*install* dari HP mana pun (tombol "Add to Home Screen" / "Install app").
+4. Klik **Deploy**. Beres Ã¢â‚¬â€ dapat URL `https://nama-project.vercel.app` yang bisa dibuka dan di-*install* dari HP mana pun (tombol "Add to Home Screen" / "Install app").
 
 Netlify dan Cloudflare Pages juga bisa dipakai dengan cara serupa (hubungkan repo, isi env var yang sama, build command `npm run build`, output folder `dist`).
 
@@ -46,7 +46,7 @@ Setelah versi web ini jalan dan sudah di-deploy, folder ini bisa dibungkus denga
 
 ```bash
 npm install @capacitor/core @capacitor/cli
-npx cap init AresKu com.namakamu.aresku
+npx cap init BQFinance com.namakamu.bqfinance
 npm run build
 npx cap add android
 npx cap add ios

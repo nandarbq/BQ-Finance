@@ -64,6 +64,15 @@ function monthLabel(offset) {
   d.setMonth(d.getMonth() + offset);
   return d.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
 }
+function monthRange(offset) {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + offset);
+  const start = toISO(d);
+  d.setMonth(d.getMonth() + 1);
+  d.setDate(0);
+  return { start, end: toISO(d) };
+}
 function formatDateShort(iso) {
   const d = new Date(iso + "T00:00:00");
   const today = todayISO();
@@ -244,8 +253,8 @@ function TabBeranda({ mode, modeTx, members, setActiveTab, openQuickAdd }) {
                     <Icon size={15} color={meta.color} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p style={{ color: "#EDEFE9", fontSize: 12.5, fontWeight: 500 }} className="truncate">{meta.label}{t.note ? " · " + t.note : ""}</p>
-                    <p style={{ color: "#7A8279", fontSize: 10.5 }}>{formatDateShort(t.date)}{member ? " · " + member.name : ""}</p>
+                    <p style={{ color: "#EDEFE9", fontSize: 12.5, fontWeight: 500 }} className="truncate">{meta.label}{t.note ? " - " + t.note : ""}</p>
+                    <p style={{ color: "#7A8279", fontSize: 10.5 }}>{formatDateShort(t.date)}{member ? " - " + member.name : ""}</p>
                   </div>
                   <span style={{ color: t.type === "in" ? "#5FBF8F" : "#E17B5D", fontSize: 12.5, fontWeight: 700 }}>
                     {t.type === "in" ? "+" : "-"}{formatRupiah(t.amount)}
@@ -267,13 +276,29 @@ function TabBeranda({ mode, modeTx, members, setActiveTab, openQuickAdd }) {
 
 function TabTransaksi({ modeTx, members, onDelete }) {
   const [filter, setFilter] = useState("all");
+  const [period, setPeriod] = useState("month");
+  const [startDate, setStartDate] = useState(monthRange(0).start);
+  const [endDate, setEndDate] = useState(todayISO());
   const [confirmId, setConfirmId] = useState(null);
+
+  const periodRange = useMemo(() => {
+    if (period === "month") return monthRange(0);
+    if (period === "lastMonth") return monthRange(-1);
+    if (period === "custom") return { start: startDate, end: endDate };
+    return null;
+  }, [period, startDate, endDate]);
 
   const filtered = useMemo(() => {
     let list = [...modeTx];
     if (filter !== "all") list = list.filter((t) => t.type === filter);
+    if (periodRange?.start) list = list.filter((t) => t.date >= periodRange.start && t.date <= periodRange.end);
     return list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.createdAt - a.createdAt));
-  }, [modeTx, filter]);
+  }, [modeTx, filter, periodRange]);
+
+  const summary = useMemo(() => filtered.reduce((total, t) => {
+    total[t.type === "in" ? "income" : "expense"] += t.amount;
+    return total;
+  }, { income: 0, expense: 0 }), [filtered]);
 
   const grouped = useMemo(() => {
     const map = {};
@@ -290,6 +315,18 @@ function TabTransaksi({ modeTx, members, onDelete }) {
             {f.label}
           </button>
         ))}
+      </div>
+      <div className="rounded-2xl p-3 mb-4" style={{ background: "#161F1B" }}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5" style={{ color: "#C9A44C" }}><Calendar size={14} /><span style={{ fontSize: 11.5, fontWeight: 600 }}>Periode transaksi</span></div>
+          <select value={period} onChange={(e) => setPeriod(e.target.value)} aria-label="Pilih periode transaksi" className="outline-none rounded-lg px-2 py-1" style={{ background: "#232E29", color: "#EDEFE9", fontSize: 11.5 }}>
+            <option value="all">Semua waktu</option><option value="month">Bulan ini</option><option value="lastMonth">Bulan lalu</option><option value="custom">Pilih rentang</option>
+          </select>
+        </div>
+        {period === "custom" && <div className="flex items-center gap-2 mt-3"><input type="date" value={startDate} max={endDate || todayISO()} onChange={(e) => setStartDate(e.target.value)} aria-label="Tanggal mulai" className="min-w-0 flex-1 rounded-lg px-2 py-1.5 outline-none" style={{ background: "#1B2420", color: "#EDEFE9", fontSize: 11 }} /><span style={{ color: "#7A8279", fontSize: 11 }}>s/d</span><input type="date" value={endDate} min={startDate} max={todayISO()} onChange={(e) => setEndDate(e.target.value)} aria-label="Tanggal selesai" className="min-w-0 flex-1 rounded-lg px-2 py-1.5 outline-none" style={{ background: "#1B2420", color: "#EDEFE9", fontSize: 11 }} /></div>}
+        <div className="grid grid-cols-3 gap-2 mt-3 pt-3" style={{ borderTop: "1px solid #1F2A25" }}>
+          <div><p style={{ color: "#7A8279", fontSize: 9.5 }}>Pemasukan</p><p style={{ color: "#5FBF8F", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income)}</p></div><div><p style={{ color: "#7A8279", fontSize: 9.5 }}>Pengeluaran</p><p style={{ color: "#E17B5D", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.expense)}</p></div><div><p style={{ color: "#7A8279", fontSize: 9.5 }}>Selisih</p><p style={{ color: summary.income - summary.expense >= 0 ? "#C9A44C" : "#E17B5D", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income - summary.expense)}</p></div>
+        </div>
       </div>
 
       {grouped.length === 0 ? (
@@ -514,7 +551,7 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
         )}
       </div>
 
-      <p className="text-center mt-5" style={{ color: "#4A524C", fontSize: 10.5 }}>AresKu · dibuat agar mencatat uang tidak lagi terasa merepotkan</p>
+      <p className="text-center mt-5" style={{ color: "#4A524C", fontSize: 10.5 }}>BQ Finance Ãƒâ€šÃ‚Â· dibuat agar mencatat uang tidak lagi terasa merepotkan</p>
     </div>
   );
 }
@@ -770,7 +807,7 @@ export default function AresKuApp({ session }) {
           <div className="flex items-center justify-between mb-3">
             <div>
               <p style={{ fontFamily: "'Sora', sans-serif", color: "#F5F2E9", fontWeight: 800, fontSize: 19, letterSpacing: "-0.01em" }}>
-                Ares<span style={{ color: "#C9A44C" }}>Ku</span>
+                BQ <span style={{ color: "#C9A44C" }}>Finance</span>
               </p>
               <p style={{ color: "#7A8279", fontSize: 10.5, marginTop: -2 }}>Catat uangmu tanpa ribet</p>
             </div>
