@@ -45,7 +45,7 @@ const MEMBER_COLORS = ["var(--blue)", "var(--cat-teal)", "var(--negative)", "var
 
 function formatRupiah(n) {
   const v = Number(n) || 0;
-  return "Rp " + Math.round(Math.abs(v)).toLocaleString("id-ID");
+  return "Rp " + Math.round(v).toLocaleString("id-ID");
 }
 function nameFromEmail(email) {
   const base = (email || "").split("@")[0] || "Pengguna";
