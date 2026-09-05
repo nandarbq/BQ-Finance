@@ -5,7 +5,7 @@ import {
   GraduationCap, MoreHorizontal, Gift, Briefcase, TrendingUp,
 Sparkles, ChevronLeft, ChevronRight, Trash2, Calendar, PiggyBank,
 Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon, Camera,
-ZoomIn, ZoomOut, Pencil, FileDown,
+ZoomIn, ZoomOut, Pencil, FileDown, Download, WifiOff,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
@@ -916,6 +916,14 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [displayName, setDisplayName] = useState(() => localStorage.getItem("bqfinance_name_" + userId) || nameFromEmail(userEmail));
   const [cropSrc, setCropSrc] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [installEvent, setInstallEvent] = useState(null);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  const isStandalone = typeof window !== "undefined" && (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: minimal-ui)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
+    window.navigator.standalone
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -939,6 +947,23 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("bq_finance_theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setInstallEvent(e); };
+    const onInstalled = () => setInstallEvent(null);
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [transactions, mode]);
 
   const handleSaveTransaction = useCallback(async (draft) => {
@@ -1011,6 +1036,13 @@ async function handleSignOut() {
     await supabase.auth.signOut();
   }
 
+  async function handleInstallApp() {
+    if (!installEvent) return;
+    installEvent.prompt();
+    await installEvent.userChoice;
+    setInstallEvent(null);
+  }
+
   function handleAvatarFile(file) {
     if (!file || !file.type.startsWith("image/")) {
       alert("Pilih file gambar untuk foto profil.");
@@ -1068,10 +1100,17 @@ return (
               </p>
               <p style={{ color: "var(--text-muted)", fontSize: 10.5, marginTop: -2 }}>Catat uangmu tanpa ribet</p>
             </div>
-            <button onClick={() => setProfileOpen(true)} aria-label="Buka profil" className="transition-transform active:scale-90 flex items-center gap-2 flex-shrink-0" style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}>
-              <span className="truncate text-right" style={{ maxWidth: 100, color: "var(--text-primary)", fontSize: 13, fontWeight: 600 }}>{displayName}</span>
-              <ProfileAvatar avatar={avatar} size={38} innerId="sb-header" />
-            </button>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {installEvent && !isStandalone && (
+                <button onClick={handleInstallApp} aria-label="Install aplikasi" title="Install aplikasi" className="transition-transform active:scale-90 flex items-center justify-center rounded-full" style={{ width: 36, height: 36, border: "none", background: "var(--bg-surface)", cursor: "pointer" }}>
+                  <Download size={16} color="var(--blue)" />
+                </button>
+              )}
+              <button onClick={() => setProfileOpen(true)} aria-label="Buka profil" className="transition-transform active:scale-90 flex items-center gap-2" style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+                <span className="truncate text-right" style={{ maxWidth: 100, color: "var(--text-primary)", fontSize: 13, fontWeight: 600 }}>{displayName}</span>
+                <ProfileAvatar avatar={avatar} size={38} innerId="sb-header" />
+              </button>
+            </div>
           </div>
           <div className="flex rounded-xl p-1" style={{ background: "var(--bg-surface)" }}>
             <button onClick={() => handleModeChange("pribadi")} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-colors" style={{ background: mode === "pribadi" ? "var(--bg-selected)" : "transparent" }}>
@@ -1083,6 +1122,12 @@ return (
               <span style={{ color: mode === "keluarga" ? "var(--text-primary)" : "var(--text-muted)", fontSize: 11.5, fontWeight: 600 }}>Keluarga</span>
             </button>
           </div>
+          {!isOnline && (
+            <div className="flex items-center justify-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg" style={{ background: "rgba(238,74,73,0.12)" }}>
+              <WifiOff size={12} color="var(--negative)" />
+              <span style={{ color: "var(--negative)", fontSize: 10.5, fontWeight: 600 }}>Offline — data yang tampil mungkin belum yang terbaru</span>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
