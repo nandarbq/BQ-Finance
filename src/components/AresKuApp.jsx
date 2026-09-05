@@ -5,7 +5,7 @@ import {
   GraduationCap, MoreHorizontal, Gift, Briefcase, TrendingUp,
 Sparkles, ChevronLeft, ChevronRight, Trash2, Calendar, PiggyBank,
 Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon, Camera,
-ZoomIn, ZoomOut, Pencil,
+ZoomIn, ZoomOut, Pencil, FileDown,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
@@ -16,6 +16,7 @@ import {
   fetchTransactions, insertTransaction, deleteTransactionById, deleteTransactionsByMode,
   fetchMembers, insertMember, deleteMemberById,
 } from "../lib/financeApi";
+import { exportTransactionPdf } from "../lib/exportPdf";
 
 /* ----------------------------- Konstanta & util ---------------------------- */
 
@@ -449,7 +450,7 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Transaksi -------------------------------- */
 
-function TabTransaksi({ modeTx, members, onDelete }) {
+function TabTransaksi({ modeTx, members, mode, displayName, onDelete }) {
   const [filter, setFilter] = useState("all");
   const [period, setPeriod] = useState("month");
   const [startDate, setStartDate] = useState(monthRange(0).start);
@@ -475,11 +476,32 @@ function TabTransaksi({ modeTx, members, onDelete }) {
     return total;
   }, { income: 0, expense: 0 }), [filtered]);
 
-  const grouped = useMemo(() => {
+const grouped = useMemo(() => {
     const map = {};
     filtered.forEach((t) => { if (!map[t.date]) map[t.date] = []; map[t.date].push(t); });
     return Object.entries(map);
   }, [filtered]);
+
+  function periodLabel() {
+    if (period === "all") return "Semua waktu";
+    if (period === "month") return monthLabel(0);
+    if (period === "lastMonth") return monthLabel(-1);
+    return formatDateShort(startDate) + " - " + formatDateShort(endDate);
+  }
+
+  function handleExportPdf() {
+    if (filtered.length === 0) {
+      alert("Tidak ada transaksi untuk diekspor. Periksa kembali periode dan filter.");
+      return;
+    }
+    exportTransactionPdf({
+      transactions: filtered,
+      members,
+      mode,
+      periodLabel: periodLabel(),
+      displayName,
+    });
+  }
 
   return (
     <div className="px-4 pt-1 pb-4">
@@ -499,9 +521,13 @@ function TabTransaksi({ modeTx, members, onDelete }) {
           </select>
         </div>
         {period === "custom" && <div className="flex items-center gap-2 mt-3"><input type="date" value={startDate} max={endDate || todayISO()} onChange={(e) => setStartDate(e.target.value)} aria-label="Tanggal mulai" className="min-w-0 flex-1 rounded-lg px-2 py-1.5 outline-none" style={{ background: "var(--bg-muted)", color: "var(--text-primary)", fontSize: 11 }} /><span style={{ color: "var(--text-muted)", fontSize: 11 }}>s/d</span><input type="date" value={endDate} min={startDate} max={todayISO()} onChange={(e) => setEndDate(e.target.value)} aria-label="Tanggal selesai" className="min-w-0 flex-1 rounded-lg px-2 py-1.5 outline-none" style={{ background: "var(--bg-muted)", color: "var(--text-primary)", fontSize: 11 }} /></div>}
-        <div className="grid grid-cols-3 gap-2 mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
+<div className="grid grid-cols-3 gap-2 mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
           <div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Pemasukan</p><p style={{ color: "var(--positive)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income)}</p></div><div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Pengeluaran</p><p style={{ color: "var(--negative)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.expense)}</p></div><div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Selisih</p><p style={{ color: summary.income - summary.expense >= 0 ? "var(--blue)" : "var(--negative)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income - summary.expense)}</p></div>
         </div>
+        <button onClick={handleExportPdf} className="w-full mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2"
+          style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 11.5, fontWeight: 700 }}>
+          <FileDown size={13} />Export PDF
+        </button>
       </div>
 
       {grouped.length === 0 ? (
@@ -1066,7 +1092,7 @@ return (
           ) : (
             <div key={activeTab} className="aresku-tabfade">
               {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} members={members} setActiveTab={setActiveTab} openQuickAdd={() => setQuickAddOpen(true)} />}
-              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} onDelete={handleDeleteTransaction} />}
+              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
                 <TabPengaturan mode={mode} members={members} modeTx={modeTx} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} />
