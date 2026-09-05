@@ -152,12 +152,13 @@ function TabBeranda({ mode, modeTx, members, setActiveTab, openQuickAdd }) {
   const monthIncome = useMemo(() => monthTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [monthTx]);
   const monthExpense = useMemo(() => monthTx.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0), [monthTx]);
 
-  const catBreakdown = useMemo(() => {
-    const map = {};
-    monthTx.filter((t) => t.type === "out").forEach((t) => { map[t.category] = (map[t.category] || 0) + t.amount; });
-    return Object.entries(map)
-      .map(([catId, val]) => { const meta = getCatMeta("out", catId); return { name: meta.label, value: val, color: meta.color }; })
-      .sort((a, b) => b.value - a.value).slice(0, 5);
+const catBreakdown = useMemo(() => {
+    const map = { in: 0, out: 0 };
+    monthTx.forEach((t) => { map[t.type] += t.amount; });
+    return [
+      { name: "Pemasukan", value: map.in, color: "var(--positive)" },
+      { name: "Pengeluaran", value: map.out, color: "var(--negative)" },
+    ].filter((c) => c.value > 0);
   }, [monthTx]);
 
   const recent = useMemo(() => [...modeTx].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5), [modeTx]);
@@ -203,11 +204,11 @@ function TabBeranda({ mode, modeTx, members, setActiveTab, openQuickAdd }) {
 
       <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
         <div className="flex items-center justify-between mb-1">
-          <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Pengeluaran per kategori</p>
+<p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Pemasukan & pengeluaran</p>
           <button onClick={() => setActiveTab("grafik")} style={{ color: "var(--blue)", fontSize: 11.5, fontWeight: 600 }}>Lihat grafik</button>
         </div>
         {catBreakdown.length === 0 ? (
-          <EmptyState icon={PieIcon} title="Belum ada pengeluaran bulan ini" subtitle="Catat pengeluaranmu untuk melihat rinciannya di sini." />
+          <EmptyState icon={PieIcon} title="Belum ada transaksi bulan ini" subtitle="Catat pemasukan & pengeluaranmu untuk melihat grafiknya di sini." />
         ) : (
           <div className="flex items-center gap-3 mt-2">
             <div style={{ width: 84, height: 84, flexShrink: 0 }}>
@@ -382,14 +383,12 @@ function TabGrafik({ modeTx }) {
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
 
 const catBreakdown = useMemo(() => {
-    const map = {};
-    monthTx.forEach((t) => {
-      map[t.category] = map[t.category] || { val: 0, type: t.type };
-      map[t.category].val += t.amount;
-    });
-    return Object.entries(map)
-      .map(([catId, data]) => { const meta = getCatMeta(data.type, catId); return { name: meta.label, value: data.val, type: data.type, color: meta.color }; })
-      .sort((a, b) => b.value - a.value);
+    const map = { in: 0, out: 0 };
+    monthTx.forEach((t) => { map[t.type] += t.amount; });
+    return [
+      { name: "Pemasukan", value: map.in, type: "in", color: "var(--positive)" },
+      { name: "Pengeluaran", value: map.out, type: "out", color: "var(--negative)" },
+    ].filter((c) => c.value > 0);
   }, [monthTx]);
   const totalMonth = catBreakdown.reduce((s, c) => s + c.value, 0);
 
@@ -415,7 +414,7 @@ const catBreakdown = useMemo(() => {
       </div>
 
       <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
-<p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }} className="mb-2">Pemasukan & pengeluaran per kategori</p>
+<p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }} className="mb-2">Pemasukan & pengeluaran</p>
         {catBreakdown.length === 0 ? (
           <EmptyState icon={PieIcon} title="Tidak ada data" subtitle="Belum ada transaksi tercatat pada bulan ini." />
         ) : (
@@ -473,7 +472,7 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Pengaturan -------------------------------- */
 
-function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData, modeTx, userEmail, onSignOut }) {
+function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData, modeTx, userEmail, onSignOut, theme, onToggleTheme }) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(MEMBER_COLORS[0]);
@@ -486,7 +485,7 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
 
   return (
     <div className="px-4 pt-1 pb-4">
-      <div className="rounded-2xl p-4 mb-4 flex items-center justify-between" style={{ background: "var(--bg-surface)" }}>
+<div className="rounded-2xl p-4 mb-4 flex items-center justify-between" style={{ background: "var(--bg-surface)" }}>
         <div className="min-w-0">
           <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }} className="truncate">{userEmail}</p>
           <p style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>Masuk sebagai</p>
@@ -502,6 +501,16 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
         <p style={{ color: "var(--text-muted)", fontSize: 11.5, marginTop: 3 }}>
           {mode === "keluarga" ? "Pencatatan keuangan keluarga. Setiap transaksi dapat dikaitkan dengan anggota keluarga." : "Pencatatan keuangan pribadi. Ganti ke mode Keluarga lewat tombol di bagian atas beranda."}
         </p>
+      </div>
+
+      <div className="rounded-2xl p-4 mb-4 flex items-center justify-between" style={{ background: "var(--bg-surface)" }}>
+        <div className="flex-1 min-w-0 mr-3">
+          <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Tampilan</p>
+          <p style={{ color: "var(--text-muted)", fontSize: 11.5, marginTop: 3 }}>{theme === "light" ? "Mode terang aktif" : "Mode gelap aktif"}</p>
+        </div>
+        <button onClick={onToggleTheme} aria-label="Ganti tema" className="flex items-center justify-center rounded-xl flex-shrink-0" style={{ width: 38, height: 38, background: "var(--bg-muted)", border: "1px solid var(--border)" }}>
+          {theme === "light" ? <Moon size={17} color="var(--blue)" /> : <Sun size={17} color="var(--blue-light)" />}
+        </button>
       </div>
 
       {mode === "keluarga" && (
@@ -801,11 +810,8 @@ return (
               <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 19, letterSpacing: "-0.01em" }}>
                 BQ <span style={{ color: "var(--blue)" }}>Finance</span>
               </p>
-              <p style={{ color: "var(--text-muted)", fontSize: 10.5, marginTop: -2 }}>Catat uangmu tanpa ribet</p>
+<p style={{ color: "var(--text-muted)", fontSize: 10.5, marginTop: -2 }}>Catat uangmu tanpa ribet</p>
             </div>
-            <button onClick={() => setTheme((current) => current === "light" ? "dark" : "light")} aria-label="Ganti tema" className="flex items-center justify-center rounded-xl" style={{ width: 34, height: 34, background: "var(--bg-muted)", border: "1px solid var(--border)" }}>
-              {theme === "light" ? <Moon size={16} color="var(--blue)" /> : <Sun size={16} color="var(--blue-light)" />}
-            </button>
           </div>
           <div className="flex rounded-xl p-1" style={{ background: "var(--bg-surface)" }}>
             <button onClick={() => handleModeChange("pribadi")} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-colors" style={{ background: mode === "pribadi" ? "var(--bg-selected)" : "transparent" }}>
@@ -830,7 +836,7 @@ return (
               {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} onDelete={handleDeleteTransaction} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
-                <TabPengaturan mode={mode} members={members} modeTx={modeTx} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} />
+                <TabPengaturan mode={mode} members={members} modeTx={modeTx} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} />
               )}
             </div>
           )}
