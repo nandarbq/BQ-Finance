@@ -3,8 +3,9 @@ import {
   Plus, X, Home, PieChart as PieIcon, ListChecks, Settings, Users,
   UtensilsCrossed, Car, ShoppingBag, Receipt, Gamepad2, HeartPulse,
   GraduationCap, MoreHorizontal, Gift, Briefcase, TrendingUp,
-  Sparkles, ChevronLeft, ChevronRight, Trash2, Calendar, PiggyBank,
-  Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon,
+Sparkles, ChevronLeft, ChevronRight, Trash2, Calendar, PiggyBank,
+Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon, Camera,
+ZoomIn, ZoomOut, Pencil,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
@@ -43,6 +44,10 @@ const MEMBER_COLORS = ["var(--blue)", "var(--cat-teal)", "var(--negative)", "var
 function formatRupiah(n) {
   const v = Number(n) || 0;
   return "Rp " + Math.round(Math.abs(v)).toLocaleString("id-ID");
+}
+function nameFromEmail(email) {
+  const base = (email || "").split("@")[0] || "Pengguna";
+  return base.charAt(0).toUpperCase() + base.slice(1);
 }
 function toISO(d) {
   const off = d.getTimezoneOffset();
@@ -136,6 +141,175 @@ function EmptyState({ icon: Icon, title, subtitle }) {
       </div>
       <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 14 }}>{title}</p>
       {subtitle ? <p style={{ color: "var(--text-muted)", fontSize: 12.5, marginTop: 4, maxWidth: 220 }}>{subtitle}</p> : null}
+    </div>
+  );
+}
+
+function RobotAvatar({ size = 36, innerId = "sb" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 96 96" style={{ display: "block", borderRadius: "999px", flexShrink: 0 }}>
+      <defs>
+        <linearGradient id={innerId + "-bg"} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7fe3b8" />
+          <stop offset="100%" stopColor="#1bb87f" />
+        </linearGradient>
+      </defs>
+      <circle cx="48" cy="48" r="48" fill={"url(#" + innerId + "-bg)"} />
+      <g>
+        <line x1="48" y1="23" x2="48" y2="15" stroke="#eafff4" strokeWidth="3.5" strokeLinecap="round" />
+        <circle cx="48" cy="12" r="5" fill="#eafff4" />
+        <rect x="22" y="40" width="8" height="16" rx="4" fill="#eafff4" opacity="0.92" />
+        <rect x="66" y="40" width="8" height="16" rx="4" fill="#eafff4" opacity="0.92" />
+        <rect x="29" y="24" width="38" height="40" rx="15" fill="#fff" />
+        <circle cx="40" cy="43" r="5" fill="#0b7c53" />
+        <circle cx="56" cy="43" r="5" fill="#0b7c53" />
+        <path d="M40 54q8 8 16 0" stroke="#0b7c53" strokeWidth="3" strokeLinecap="round" fill="none" />
+      </g>
+    </svg>
+  );
+}
+
+function ProfileAvatar({ avatar, size = 36, innerId = "sb" }) {
+  const style = {
+    width: size, height: size, borderRadius: "999px", overflow: "hidden",
+    flexShrink: 0, display: "block",
+  };
+  if (avatar) {
+    return <img src={avatar} alt="Foto profil" referrerPolicy="no-referrer" style={{ ...style, objectFit: "cover" }} />;
+  }
+  return <RobotAvatar size={size} innerId={innerId} />;
+}
+
+function CropSheet({ src, onClose, onConfirm }) {
+  const V = 280;
+  const OUT = 512;
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [extra, setExtra] = useState(null);
+  const imgRef = useRef(null);
+  const dragRef = useRef(null);
+
+  const dw = extra ? extra.dw * scale : 0;
+  const dh = extra ? extra.dh * scale : 0;
+  const maxX = Math.max(0, dw - V);
+  const maxY = Math.max(0, dh - V);
+
+  function clampOffset(o) {
+    return { x: Math.min(Math.max(o.x, 0), maxX), y: Math.min(Math.max(o.y, 0), maxY) };
+  }
+
+  function onImgLoad() {
+    const img = imgRef.current;
+    const base = Math.max(V / img.naturalWidth, V / img.naturalHeight);
+    setExtra({ base, dw: img.naturalWidth * base, dh: img.naturalHeight * base });
+    setOffset({
+      x: Math.max(0, (img.naturalWidth * base - V) / 2),
+      y: Math.max(0, (img.naturalHeight * base - V) / 2),
+    });
+  }
+
+  function handleZoom(next) {
+    const z = Math.min(Math.max(next, 1), 4);
+    const centerX = (offset.x + V / 2) * (z / scale);
+    const centerY = (offset.y + V / 2) * (z / scale);
+    const nw = extra.dw * z;
+    const nh = extra.dh * z;
+    setScale(z);
+    setOffset({
+      x: Math.min(Math.max(centerX - V / 2, 0), Math.max(0, nw - V)),
+      y: Math.min(Math.max(centerY - V / 2, 0), Math.max(0, nh - V)),
+    });
+  }
+
+  function onPointerDown(e) {
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function onPointerMove(e) {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.sx;
+    const dy = e.clientY - dragRef.current.sy;
+    setOffset(clampOffset({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy }));
+  }
+  function onPointerUp(e) {
+    if (dragRef.current && e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    dragRef.current = null;
+  }
+
+  function handleConfirm() {
+    const img = imgRef.current;
+    const s = extra.base * scale;
+    const canvas = document.createElement("canvas");
+    canvas.width = OUT;
+    canvas.height = OUT;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, offset.x / s, offset.y / s, V / s, V / s, 0, 0, OUT, OUT);
+    onConfirm(canvas.toDataURL("image/jpeg", 0.9));
+  }
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col justify-end">
+      <div className="absolute inset-0 aresku-fade-in" style={{ background: "rgba(5,10,8,0.65)" }} onClick={onClose} />
+      <div className="relative aresku-sheet-up rounded-t-3xl px-5 pt-4 pb-5" style={{ background: "var(--bg-surface)" }}>
+        <div className="flex items-center justify-between mb-1">
+          <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>Atur foto profil</p>
+          <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <p style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 14 }}>Geser untuk memindahkan, geser slider untuk zoom.</p>
+        <div
+          className="relative mx-auto select-none overflow-hidden rounded-full"
+          style={{ width: V, height: V, background: "var(--bg-app)", touchAction: "none", cursor: "grab", boxShadow: "0 0 0 4px var(--bg-selected)" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        >
+          <img ref={imgRef} src={src} draggable={false} onLoad={onImgLoad} alt="Pratinjau foto profil"
+            style={{ position: "absolute", left: 0, top: 0, width: dw, height: dh, maxWidth: "none", userSelect: "none", WebkitUserDrag: "none", transform: "translate(" + (-offset.x) + "px," + (-offset.y) + "px)" }} />
+        </div>
+        <div className="flex items-center gap-3 mt-5 px-1">
+          <ZoomOut size={15} color="var(--text-muted)" />
+          <input type="range" min={1} max={4} step={0.01} value={scale} onChange={(e) => handleZoom(parseFloat(e.target.value))} aria-label="Perbesar foto profil" className="flex-1" />
+          <ZoomIn size={15} color="var(--text-muted)" />
+        </div>
+        <button onClick={handleConfirm} className="w-full mt-5 py-3 rounded-2xl flex items-center justify-center gap-1.5"
+          style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700 }}>
+          <Check size={15} />Simpan foto
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvatar }) {
+  const fileRef = useRef(null);
+
+  function pickFile() { if (fileRef.current) fileRef.current.click(); }
+
+  return (
+    <div className="absolute inset-0 z-40 flex flex-col justify-end">
+      <div className="absolute inset-0 aresku-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
+      <div className="relative aresku-sheet-up rounded-t-3xl px-4 pt-4 pb-5" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>Profil</p>
+          <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+        <div className="flex flex-col items-center">
+          <div className="relative" style={{ cursor: "pointer" }} onClick={pickFile}>
+            <ProfileAvatar avatar={avatar} size={92} innerId="sb-profile" />
+            <div className="absolute flex items-center justify-center rounded-full" style={{ bottom: -2, right: -2, width: 30, height: 30, background: "var(--blue)", boxShadow: "0 0 0 3px var(--bg-surface)" }}>
+              <Camera size={14} color="var(--bg-app)" />
+            </div>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files && e.target.files[0]; if (f) onFileSelect(f); e.target.value = ""; }} />
+          <p className="mt-3" style={{ color: "var(--text-primary)", fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 700 }}>{name}</p>
+          <p style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>{email}</p>
+        </div>
+        <div className="flex flex-col gap-2 mt-5">
+          <button onClick={pickFile} className="w-full py-2.5 rounded-xl" style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 12.5, fontWeight: 700 }}>Ganti foto</button>
+          {avatar && <button onClick={onRemoveAvatar} className="w-full py-2.5 rounded-xl" style={{ background: "var(--bg-muted)", color: "var(--negative)", fontSize: 12.5, fontWeight: 700 }}>Hapus foto</button>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -472,11 +646,13 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Pengaturan -------------------------------- */
 
-function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData, modeTx, userEmail, onSignOut, theme, onToggleTheme }) {
+function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData, modeTx, userEmail, onSignOut, theme, onToggleTheme, displayName, onNameChange }) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(MEMBER_COLORS[0]);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [editName, setEditName] = useState(displayName);
 
   const memberTotals = useMemo(() => members.map((m) => {
     const spent = modeTx.filter((t) => t.memberId === m.id && t.type === "out").reduce((s, t) => s + t.amount, 0);
@@ -486,9 +662,29 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
   return (
     <div className="px-4 pt-1 pb-4">
 <div className="rounded-2xl p-4 mb-4 flex items-center justify-between" style={{ background: "var(--bg-surface)" }}>
-        <div className="min-w-0">
-          <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }} className="truncate">{userEmail}</p>
-          <p style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }}>Masuk sebagai</p>
+        <div className="min-w-0 flex-1 mr-2">
+          {editingName ? (
+            <div className="flex items-center gap-1.5">
+              <input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder={displayName} maxLength={40} autoFocus
+                className="flex-1 min-w-0 px-3 py-2 rounded-xl outline-none" style={{ background: "var(--bg-muted)", color: "var(--text-primary)", fontSize: 13, border: "1px solid var(--bg-selected)" }} />
+              <button onClick={() => { onNameChange(editName); setEditingName(false); }} disabled={!editName || !editName.trim()} aria-label="Simpan nama"
+                className="p-2 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: !editName || !editName.trim() ? "var(--bg-selected)" : "var(--blue)", color: !editName || !editName.trim() ? "var(--text-faint)" : "var(--bg-app)" }}>
+                <Check size={15} />
+              </button>
+              <button onClick={() => { setEditName(displayName); setEditingName(false); }} aria-label="Batal ubah nama"
+                className="p-2 flex items-center justify-center rounded-xl flex-shrink-0" style={{ background: "var(--bg-muted)", color: "var(--text-secondary)" }}>
+                <X size={15} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }} className="truncate">{displayName}</p>
+              <button onClick={() => { setEditName(displayName); setEditingName(true); }} aria-label="Ubah nama" className="p-1.5 rounded-full flex-shrink-0 transition-transform active:scale-90" style={{ background: "var(--bg-muted)" }}>
+                <Pencil size={12} color="var(--blue)" />
+              </button>
+            </div>
+          )}
+          <p style={{ color: "var(--text-muted)", fontSize: 11, marginTop: 2 }} className="truncate">Masuk sebagai {userEmail}</p>
         </div>
         <button onClick={onSignOut} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-shrink-0" style={{ background: "var(--bg-muted)" }}>
           <LogOut size={12} color="var(--negative)" />
@@ -497,7 +693,7 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
       </div>
 
       <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
-        <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Mode aktif</p>
+          <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Mode aktif</p>
         <p style={{ color: "var(--text-muted)", fontSize: 11.5, marginTop: 3 }}>
           {mode === "keluarga" ? "Pencatatan keuangan keluarga. Setiap transaksi dapat dikaitkan dengan anggota keluarga." : "Pencatatan keuangan pribadi. Ganti ke mode Keluarga lewat tombol di bagian atas beranda."}
         </p>
@@ -564,7 +760,7 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
         )}
       </div>
 
-      <p className="text-center mt-5" style={{ color: "var(--text-faint)", fontSize: 10.5 }}>BQ Finance ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· dibuat agar mencatat uang tidak lagi terasa merepotkan</p>
+      <p className="text-center mt-5" style={{ color: "var(--text-faint)", fontSize: 10.5 }}>BQ Finance · dibuat agar mencatat uang tidak lagi terasa merepotkan</p>
     </div>
   );
 }
@@ -689,6 +885,10 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("bq_finance_theme") || "light");
+  const [avatar, setAvatar] = useState(() => localStorage.getItem("aresku_avatar_" + userId) || null);
+  const [displayName, setDisplayName] = useState(() => localStorage.getItem("aresku_name_" + userId) || nameFromEmail(userEmail));
+  const [cropSrc, setCropSrc] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -780,8 +980,37 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     localStorage.setItem("aresku_mode", m);
   }
 
-  async function handleSignOut() {
+async function handleSignOut() {
     await supabase.auth.signOut();
+  }
+
+  function handleAvatarFile(file) {
+    if (!file || !file.type.startsWith("image/")) {
+      alert("Pilih file gambar untuk foto profil.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => alert("Gagal memuat foto. Coba gunakan gambar lain.");
+    reader.onload = () => setCropSrc(reader.result);
+    reader.readAsDataURL(file);
+  }
+
+  function handleCropConfirm(dataUrl) {
+    setAvatar(dataUrl);
+    localStorage.setItem("aresku_avatar_" + userId, dataUrl);
+    setCropSrc(null);
+  }
+
+  function handleRemoveAvatar() {
+    setAvatar(null);
+    localStorage.removeItem("aresku_avatar_" + userId);
+  }
+
+  function handleNameChange(next) {
+    const clean = (next || "").trim();
+    const final = clean || nameFromEmail(userEmail);
+    setDisplayName(final);
+    localStorage.setItem("aresku_name_" + userId, final);
   }
 
 return (
@@ -805,13 +1034,17 @@ return (
 
       <div className="relative w-full flex flex-col overflow-hidden" style={{ maxWidth: 428, height: "100vh", maxHeight: 926, background: "var(--bg-app)", borderRadius: 34, boxShadow: "0 30px 90px rgba(0,0,0,0.55)" }}>
 <div className="px-4 pt-3 pb-2 flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
+<div className="flex items-center justify-between mb-3">
             <div>
               <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 19, letterSpacing: "-0.01em" }}>
                 BQ <span style={{ color: "var(--blue)" }}>Finance</span>
               </p>
 <p style={{ color: "var(--text-muted)", fontSize: 10.5, marginTop: -2 }}>Catat uangmu tanpa ribet</p>
             </div>
+            <button onClick={() => setProfileOpen(true)} aria-label="Buka profil" className="transition-transform active:scale-90 flex items-center gap-2 flex-shrink-0" style={{ border: "none", background: "none", padding: 0, cursor: "pointer" }}>
+              <span className="truncate text-right" style={{ maxWidth: 100, color: "var(--text-primary)", fontSize: 13, fontWeight: 600 }}>{displayName}</span>
+              <ProfileAvatar avatar={avatar} size={38} innerId="sb-header" />
+            </button>
           </div>
           <div className="flex rounded-xl p-1" style={{ background: "var(--bg-surface)" }}>
             <button onClick={() => handleModeChange("pribadi")} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-colors" style={{ background: mode === "pribadi" ? "var(--bg-selected)" : "transparent" }}>
@@ -836,7 +1069,7 @@ return (
               {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} onDelete={handleDeleteTransaction} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
-                <TabPengaturan mode={mode} members={members} modeTx={modeTx} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} />
+                <TabPengaturan mode={mode} members={members} modeTx={modeTx} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} />
               )}
             </div>
           )}
@@ -867,6 +1100,8 @@ return (
         </button>
 
         {quickAddOpen && <QuickAddSheet mode={mode} members={members} onClose={() => setQuickAddOpen(false)} onSave={handleSaveTransaction} saving={saving} />}
+        {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} email={userEmail} avatar={avatar} name={displayName} onFileSelect={handleAvatarFile} onRemoveAvatar={handleRemoveAvatar} />}
+        {cropSrc && <CropSheet src={cropSrc} onClose={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
       </div>
     </div>
   );
