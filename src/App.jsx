@@ -1,6 +1,6 @@
 import React from "react";
 import AuthGate from "./components/AuthGate.jsx";
-import AresKuApp from "./components/AresKuApp.jsx";
+import BqFinanceApp from "./components/BqFinanceApp.jsx";
 
 export default function App() {
   React.useEffect(() => {
@@ -8,5 +8,5 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
   }, []);
 
-  return <AuthGate>{(session) => <AresKuApp session={session} />}</AuthGate>;
+  return <AuthGate>{(session) => <BqFinanceApp session={session} />}</AuthGate>;
 }

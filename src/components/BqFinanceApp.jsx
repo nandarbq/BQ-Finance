@@ -250,8 +250,8 @@ function CropSheet({ src, onClose, onConfirm }) {
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col justify-end">
-      <div className="absolute inset-0 aresku-fade-in" style={{ background: "rgba(5,10,8,0.65)" }} onClick={onClose} />
-      <div className="relative aresku-sheet-up rounded-t-3xl px-5 pt-4 pb-5" style={{ background: "var(--bg-surface)" }}>
+      <div className="absolute inset-0 bqfinance-fade-in" style={{ background: "rgba(5,10,8,0.65)" }} onClick={onClose} />
+      <div className="relative bqfinance-sheet-up rounded-t-3xl px-5 pt-4 pb-5" style={{ background: "var(--bg-surface)" }}>
         <div className="flex items-center justify-between mb-1">
           <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>Atur foto profil</p>
           <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
@@ -289,8 +289,8 @@ function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvat
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col justify-end">
-      <div className="absolute inset-0 aresku-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
-      <div className="relative aresku-sheet-up rounded-t-3xl px-4 pt-4 pb-5" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
+      <div className="absolute inset-0 bqfinance-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
+      <div className="relative bqfinance-sheet-up rounded-t-3xl px-4 pt-4 pb-5" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
         <div className="flex items-center justify-between mb-4">
           <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>Profil</p>
           <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
@@ -341,8 +341,8 @@ const catBreakdown = useMemo(() => {
   return (
     <div className="px-4 pt-1 pb-4">
       <div className="relative overflow-hidden rounded-3xl px-5 pt-5 pb-6 mb-4" style={{ background: "linear-gradient(160deg,var(--blue-soft) 0%,var(--bg-app) 60%,var(--bg-app) 100%)" }}>
-        <div className="aresku-blob aresku-blob-a" />
-        <div className="aresku-blob aresku-blob-b" />
+        <div className="bqfinance-blob bqfinance-blob-a" />
+        <div className="bqfinance-blob bqfinance-blob-b" />
         <div className="relative">
           <div className="flex items-center justify-between">
             <span style={{ color: "var(--text-muted)", fontSize: 12.5, fontWeight: 500 }}>Saldo {mode === "keluarga" ? "keluarga" : "pribadi"}</span>
@@ -818,8 +818,8 @@ function QuickAddSheet({ mode, members, onClose, onSave, saving }) {
 
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end">
-      <div className="absolute inset-0 aresku-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
-      <div className="relative aresku-sheet-up rounded-t-3xl px-4 pt-4 pb-5 max-h-[88%] overflow-y-auto" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
+      <div className="absolute inset-0 bqfinance-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
+      <div className="relative bqfinance-sheet-up rounded-t-3xl px-4 pt-4 pb-5 max-h-[88%] overflow-y-auto" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
         <div className="flex items-center justify-between mb-3">
           <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>{type === "out" ? "Catat pengeluaran" : "Catat pemasukan"}</p>
           <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
@@ -898,12 +898,12 @@ function QuickAddSheet({ mode, members, onClose, onSave, saving }) {
 
 /* ---------------------------------- App ------------------------------------ */
 
-export default function AresKuApp({ session }) {
+export default function BqFinanceApp({ session }) {
   const userId = session.user.id;
   const userEmail = session.user.email;
 
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState(() => localStorage.getItem("aresku_mode") || "pribadi");
+  const [mode, setMode] = useState(() => localStorage.getItem("bqfinance_mode") || "pribadi");
   const [transactions, setTransactions] = useState([]);
   const [members, setMembers] = useState([]);
   const [activeTab, setActiveTab] = useState("beranda");
@@ -911,8 +911,8 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("bq_finance_theme") || "light");
-  const [avatar, setAvatar] = useState(() => localStorage.getItem("aresku_avatar_" + userId) || null);
-  const [displayName, setDisplayName] = useState(() => localStorage.getItem("aresku_name_" + userId) || nameFromEmail(userEmail));
+  const [avatar, setAvatar] = useState(() => localStorage.getItem("bqfinance_avatar_" + userId) || null);
+  const [displayName, setDisplayName] = useState(() => localStorage.getItem("bqfinance_name_" + userId) || nameFromEmail(userEmail));
   const [cropSrc, setCropSrc] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -1003,7 +1003,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
 
   function handleModeChange(m) {
     setMode(m);
-    localStorage.setItem("aresku_mode", m);
+    localStorage.setItem("bqfinance_mode", m);
   }
 
 async function handleSignOut() {
@@ -1023,38 +1023,38 @@ async function handleSignOut() {
 
   function handleCropConfirm(dataUrl) {
     setAvatar(dataUrl);
-    localStorage.setItem("aresku_avatar_" + userId, dataUrl);
+    localStorage.setItem("bqfinance_avatar_" + userId, dataUrl);
     setCropSrc(null);
   }
 
   function handleRemoveAvatar() {
     setAvatar(null);
-    localStorage.removeItem("aresku_avatar_" + userId);
+    localStorage.removeItem("bqfinance_avatar_" + userId);
   }
 
   function handleNameChange(next) {
     const clean = (next || "").trim();
     const final = clean || nameFromEmail(userEmail);
     setDisplayName(final);
-    localStorage.setItem("aresku_name_" + userId, final);
+    localStorage.setItem("bqfinance_name_" + userId, final);
   }
 
 return (
     <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
       <style>{`
-        .aresku-blob { position: absolute; border-radius: 999px; filter: blur(30px); opacity: 0.35; pointer-events: none; }
-        .aresku-blob-a { width: 160px; height: 160px; background: var(--blue); top: -60px; right: -40px; animation: aresku-float-a 9s ease-in-out infinite; }
-        .aresku-blob-b { width: 130px; height: 130px; background: var(--cat-teal); bottom: -50px; left: -30px; animation: aresku-float-b 11s ease-in-out infinite; }
-        @keyframes aresku-float-a { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-14px,16px) scale(1.12); } }
-        @keyframes aresku-float-b { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(12px,-10px) scale(1.08); } }
-        .aresku-fade-in { animation: aresku-fadein 0.2s ease-out; }
-        @keyframes aresku-fadein { from { opacity: 0; } to { opacity: 1; } }
-        .aresku-sheet-up { animation: aresku-sheetup 0.28s cubic-bezier(0.22,1,0.36,1); }
-        @keyframes aresku-sheetup { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .aresku-tabfade { animation: aresku-tabfade 0.25s ease-out; }
-        @keyframes aresku-tabfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .bqfinance-blob { position: absolute; border-radius: 999px; filter: blur(30px); opacity: 0.35; pointer-events: none; }
+        .bqfinance-blob-a { width: 160px; height: 160px; background: var(--blue); top: -60px; right: -40px; animation: bqfinance-float-a 9s ease-in-out infinite; }
+        .bqfinance-blob-b { width: 130px; height: 130px; background: var(--cat-teal); bottom: -50px; left: -30px; animation: bqfinance-float-b 11s ease-in-out infinite; }
+        @keyframes bqfinance-float-a { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-14px,16px) scale(1.12); } }
+        @keyframes bqfinance-float-b { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(12px,-10px) scale(1.08); } }
+        .bqfinance-fade-in { animation: bqfinance-fadein 0.2s ease-out; }
+        @keyframes bqfinance-fadein { from { opacity: 0; } to { opacity: 1; } }
+        .bqfinance-sheet-up { animation: bqfinance-sheetup 0.28s cubic-bezier(0.22,1,0.36,1); }
+        @keyframes bqfinance-sheetup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .bqfinance-tabfade { animation: bqfinance-tabfade 0.25s ease-out; }
+        @keyframes bqfinance-tabfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         @media (prefers-reduced-motion: reduce) {
-          .aresku-blob, .aresku-fade-in, .aresku-sheet-up, .aresku-tabfade { animation: none !important; }
+          .bqfinance-blob, .bqfinance-fade-in, .bqfinance-sheet-up, .bqfinance-tabfade { animation: none !important; }
         }
       `}</style>
 
@@ -1090,7 +1090,7 @@ return (
           ) : loadError ? (
             <div className="flex items-center justify-center h-full px-6 text-center"><span style={{ color: "var(--negative)", fontSize: 12 }}>{loadError}</span></div>
           ) : (
-            <div key={activeTab} className="aresku-tabfade">
+            <div key={activeTab} className="bqfinance-tabfade">
               {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} members={members} setActiveTab={setActiveTab} openQuickAdd={() => setQuickAddOpen(true)} />}
               {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
@@ -1120,10 +1120,12 @@ return (
           <div style={{ paddingBottom: "env(safe-area-inset-bottom, 6px)" }} />
         </div>
 
-        <button onClick={() => setQuickAddOpen(true)} className="absolute flex items-center justify-center transition-transform active:scale-90"
-          style={{ width: 52, height: 52, borderRadius: 999, right: 18, bottom: 74, background: "linear-gradient(135deg,var(--blue-light),var(--blue))", boxShadow: "0 8px 22px rgba(0,171,107,0.4)" }}>
-          <Plus size={22} color="var(--bg-app)" strokeWidth={2.6} />
-        </button>
+        {(activeTab === "beranda" || activeTab === "transaksi") && (
+          <button onClick={() => setQuickAddOpen(true)} className="absolute flex items-center justify-center transition-transform active:scale-90"
+            style={{ width: 52, height: 52, borderRadius: 999, right: 18, bottom: 74, background: "linear-gradient(135deg,var(--blue-light),var(--blue))", boxShadow: "0 8px 22px rgba(0,171,107,0.4)" }}>
+            <Plus size={22} color="var(--bg-app)" strokeWidth={2.6} />
+          </button>
+        )}
 
         {quickAddOpen && <QuickAddSheet mode={mode} members={members} onClose={() => setQuickAddOpen(false)} onSave={handleSaveTransaction} saving={saving} />}
         {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} email={userEmail} avatar={avatar} name={displayName} onFileSelect={handleAvatarFile} onRemoveAvatar={handleRemoveAvatar} />}

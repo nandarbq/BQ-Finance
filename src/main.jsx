@@ -9,7 +9,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>
 );
 
-// Daftarkan service worker sederhana agar AresKu bisa di-"Add to Home Screen"
+// Daftarkan service worker sederhana agar bqfinance bisa di-"Add to Home Screen"
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => {});

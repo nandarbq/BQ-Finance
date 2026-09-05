@@ -1,4 +1,4 @@
-// Service worker minimal — cukup agar AresKu terdeteksi sebagai installable PWA.
+// Service worker minimal — cukup agar bqfinance terdeteksi sebagai installable PWA.
 // Untuk cache offline yang lebih lengkap, pertimbangkan plugin vite-plugin-pwa.
 self.addEventListener("install", (event) => {
   self.skipWaiting();

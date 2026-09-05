@@ -64,7 +64,7 @@ src/
     financeApi.js        # semua query database (transaksi & anggota)
   components/
     AuthGate.jsx          # halaman login/daftar
-    AresKuApp.jsx          # aplikasi utama (beranda, transaksi, grafik, pengaturan)
+    BqFinanceApp.jsx        # aplikasi utama (beranda, transaksi, grafik, pengaturan)
   App.jsx
   main.jsx
 supabase/
