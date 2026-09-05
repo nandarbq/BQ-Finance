@@ -60,3 +60,32 @@
 html, body, #root { height: 100%; margin: 0; background: var(--bg-page); }
 ::-webkit-scrollbar { width: 0; height: 0; }
 input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.65; }
+
+.bqfinance-shell {
+  height: 100vh;
+  height: 100dvh;
+  max-width: 428px;
+  max-height: 926px;
+  border-radius: 34px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+}
+
+@media (display-mode: fullscreen), (display-mode: standalone), (display-mode: minimal-ui) {
+  .bqfinance-shell {
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+@media (max-width: 480px) {
+  .bqfinance-shell {
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding-top: env(safe-area-inset-top);
+  }
+}

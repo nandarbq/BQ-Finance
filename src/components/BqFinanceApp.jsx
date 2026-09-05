@@ -1091,7 +1091,7 @@ return (
         }
       `}</style>
 
-      <div className="relative w-full flex flex-col overflow-hidden" style={{ maxWidth: 428, height: "100vh", maxHeight: 926, background: "var(--bg-app)", borderRadius: 34, boxShadow: "0 30px 90px rgba(0,0,0,0.55)" }}>
+      <div className="bqfinance-shell relative w-full flex flex-col overflow-hidden" style={{ background: "var(--bg-app)" }}>
 <div className="px-4 pt-3 pb-2 flex-shrink-0">
 <div className="flex items-center justify-between mb-3">
             <div>
