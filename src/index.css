@@ -30,16 +30,16 @@
 }
 
 :root[data-theme="dark"] {
-  --bg-page: #0b130f;
-  --bg-app: #101813;
-  --bg-surface: #15201a;
-  --bg-muted: #1b2a22;
-  --bg-selected: #20352b;
-  --border: #263a30;
-  --text-primary: #f2f7f4;
-  --text-secondary: #c3cdc7;
-  --text-muted: #93a39a;
-  --text-faint: #67786e;
+  --bg-page: #0c0c0c;
+  --bg-app: #121212;
+  --bg-surface: #1a1a1a;
+  --bg-muted: #222222;
+  --bg-selected: #2a2a2a;
+  --border: #333333;
+  --text-primary: #f2f2f2;
+  --text-secondary: #c9c9c9;
+  --text-muted: #9c9c9c;
+  --text-faint: #707070;
   --blue: #00c78b;
   --blue-light: #3fdfa5;
   --blue-soft: #163627;
@@ -53,7 +53,7 @@
   --cat-dark: #00a876;
   --cat-olive: #b0a63f;
   --cat-soft-red: #ff7b7b;
-  --cat-gray: #93a39a;
+  --cat-gray: #9c9c9c;
 }
 
 * { font-family: "Inter", sans-serif; box-sizing: border-box; }
