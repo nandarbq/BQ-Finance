@@ -144,6 +144,15 @@ function useCountUp(value, duration = 650) {
   return display;
 }
 
+function useDebouncedValue(value, delay = 250) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(t);
+  }, [value, delay]);
+  return debounced;
+}
+
 function Avatar({ name, color, size = 32, ring = false }) {
   const initial = (name || "?").trim().charAt(0).toUpperCase();
   return (
@@ -406,6 +415,203 @@ function TxDetailSheet({ tx, members, onClose, onEdit, onDelete }) {
   );
 }
 
+function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, onConfirm }) {
+  const today = todayISO();
+  const WEEK = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+  const MONTHS = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+  const initialISO = mode === "range" ? initial?.start : initial;
+
+  const [view, setView] = useState(() => {
+    const base = initialISO ? new Date(initialISO + "T00:00:00") : new Date();
+    return { y: base.getFullYear(), m: base.getMonth() };
+  });
+  const [sel, setSel] = useState(mode === "single" ? initial || null : null);
+  const [range, setRange] = useState(mode === "range"
+    ? { start: initial?.start || null, end: initial?.end || null }
+    : { start: null, end: null });
+
+  const firstIdx = (new Date(view.y, view.m, 1).getDay() + 6) % 7;
+  const dim = new Date(view.y, view.m + 1, 0).getDate();
+
+  function cellISO(d) {
+    return view.y + "-" + String(view.m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+  }
+  function isDisabled(d) {
+    const iso = cellISO(d);
+    return (minDate && iso < minDate) || (maxDate && iso > maxDate);
+  }
+  function isRangeMiddle(d) {
+    const iso = cellISO(d);
+    return mode === "range" && range.start && range.end && iso > range.start && iso < range.end;
+  }
+  function isRangeEnd(d) {
+    const iso = cellISO(d);
+    return mode === "range" && ((range.start && iso === range.start) || (range.end && iso === range.end));
+  }
+  function isSelected(d) {
+    const iso = cellISO(d);
+    if (mode === "single") return iso === sel;
+    return (range.start && iso === range.start) || (range.end && iso === range.end);
+  }
+
+  function handleDay(d) {
+    const iso = cellISO(d);
+    if (isDisabled(d)) return;
+    if (mode === "single") {
+      setSel(iso);
+      onConfirm(iso);
+      return;
+    }
+    if (!range.start || (range.start && range.end)) {
+      setRange({ start: iso, end: null });
+    } else {
+      const [a, b] = iso < range.start ? [iso, range.start] : [range.start, iso];
+      setRange({ start: a, end: b });
+    }
+  }
+
+  function canConfirm() {
+    return mode === "single" || (mode === "range" && range.start && range.end);
+  }
+  function handleConfirm() {
+    if (!canConfirm()) return;
+    if (mode === "range") onConfirm({ start: range.start, end: range.end });
+  }
+
+  function goPrev() { setView((v) => (v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 })); }
+  function goNext() {
+    setView((v) => {
+      const now = new Date();
+      if (v.y > now.getFullYear() || (v.y === now.getFullYear() && v.m >= now.getMonth())) return v;
+      return v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 };
+    });
+  }
+  function jumpToday() {
+    const t = todayISO();
+    const base = new Date(t + "T00:00:00");
+    setView({ y: base.getFullYear(), m: base.getMonth() });
+    if (mode === "single") {
+      setSel(t);
+      onConfirm(t);
+    } else {
+      setRange({ start: t, end: t });
+    }
+  }
+
+  const cells = [];
+  for (let i = 0; i < firstIdx; i++) cells.push(<div key={"pad" + i} />);
+  for (let d = 1; d <= dim; d++) {
+    const iso = cellISO(d);
+    const off = isDisabled(d);
+    const bg = isSelected(d) ? "var(--blue)"
+      : isRangeMiddle(d) ? "var(--blue-soft)"
+      : "transparent";
+    const color = isSelected(d) ? "var(--bg-app)"
+      : isRangeMiddle(d) ? "var(--blue)"
+      : iso === today ? "var(--blue)"
+      : "var(--text-primary)";
+    cells.push(
+      <button key={d} disabled={off} onClick={() => handleDay(d)} aria-label={"Pilih tanggal " + iso}
+        className="flex items-center justify-center"
+        style={{
+          height: 36, borderRadius: 10, fontSize: 12, fontWeight: 600,
+          background: bg, color, cursor: off ? "default" : "pointer", opacity: off ? 0.35 : 1,
+          boxShadow: iso === today && !isSelected(d) ? "inset 0 0 0 1.5px var(--blue)" : "none",
+        }}>
+        {d}
+      </button>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col justify-end">
+      <div className="absolute inset-0 bqfinance-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
+      <div className="relative bqfinance-sheet-up rounded-t-3xl px-5 pt-4 pb-5" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>{mode === "range" ? "Pilih rentang tanggal" : "Pilih tanggal"}</p>
+          <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={goPrev} className="p-1.5 rounded-lg" style={{ background: "var(--bg-muted)" }}><ChevronLeft size={15} color="var(--text-secondary)" /></button>
+          <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 600, textTransform: "capitalize" }}>{MONTHS[view.m]} {view.y}</p>
+          <button onClick={goNext} className="p-1.5 rounded-lg" style={{ background: "var(--bg-muted)" }}><ChevronRight size={15} color="var(--text-secondary)" /></button>
+        </div>
+
+        <div className="grid mb-1" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          {WEEK.map((w) => (
+            <div key={w} className="flex items-center justify-center" style={{ height: 28, color: "var(--text-muted)", fontSize: 10, fontWeight: 600 }}>{w}</div>
+          ))}
+        </div>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          {cells}
+        </div>
+
+        <div className="flex items-center gap-2 mt-4">
+          <button onClick={jumpToday} className="px-3 py-1.5 rounded-full flex-shrink-0" style={{ background: "var(--bg-muted)", color: "var(--blue)", fontSize: 11, fontWeight: 600 }}>
+            Hari ini
+          </button>
+          {mode === "range" ? (
+            <div className="flex-1 flex items-center justify-end gap-1.5 overflow-hidden">
+              <span style={{ color: "var(--text-muted)", fontSize: 10.5, whiteSpace: "nowrap" }}>{range.start ? formatDateShort(range.start) : "—"}</span>
+              <span style={{ color: "var(--text-faint)", fontSize: 10.5 }}>s/d</span>
+              <span style={{ color: "var(--text-muted)", fontSize: 10.5, whiteSpace: "nowrap" }}>{range.end ? formatDateShort(range.end) : "—"}</span>
+            </div>
+          ) : null}
+        </div>
+
+        {mode === "range" && (
+          <button onClick={handleConfirm} disabled={!canConfirm()} className="w-full mt-3 py-3 rounded-2xl"
+            style={{ background: !canConfirm() ? "var(--bg-selected)" : "var(--blue)", color: !canConfirm() ? "var(--text-faint)" : "var(--bg-app)", fontSize: 13, fontWeight: 700 }}>
+            {canConfirm() ? "Gunakan rentang ini" : "Pilih tanggal mulai & selesai"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OnboardingSheet({ onClose }) {
+  const items = [
+    { icon: PiggyBank, color: "var(--blue)", text: "Catat pemasukan & pengeluaran lewat tombol + atau kartu di Beranda." },
+    { icon: Users, color: "var(--cat-teal)", text: "Ganti ke mode Keluarga untuk mencatat bersama anggota keluarga." },
+    { icon: PieIcon, color: "var(--cat-lime)", text: "Pantau tren lewat Grafik dan batasi belanja dengan Anggaran." },
+    { icon: FileDown, color: "var(--cat-olive)", text: "Cetak laporan keuangan ke PDF kapan saja dari menu Transaksi." },
+  ];
+  return (
+    <div className="absolute inset-0 z-50 flex flex-col justify-end">
+      <div className="absolute inset-0 bqfinance-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
+      <div className="relative bqfinance-sheet-up rounded-t-3xl px-5 pt-5 pb-5" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
+        <div className="text-center mb-4">
+          <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 18 }}>
+            Selamat datang di <span style={{ color: "var(--blue)" }}>BQ Finance</span>
+          </p>
+          <p style={{ color: "var(--text-muted)", fontSize: 11.5, marginTop: 4 }}>Beberapa hal yang bisa kamu lakukan:</p>
+        </div>
+        <div className="flex flex-col gap-3 mb-5">
+          {items.map((it, i) => {
+            const Icon = it.icon;
+            return (
+              <div key={i} className="flex items-start gap-3">
+                <div className="flex items-center justify-center flex-shrink-0" style={{ width: 34, height: 34, borderRadius: 11, background: "color-mix(in srgb, " + it.color + " 15%, transparent)" }}>
+                  <Icon size={16} color={it.color} />
+                </div>
+                <p style={{ color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.5 }}>{it.text}</p>
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={onClose} className="w-full py-3 rounded-2xl" style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700 }}>
+          Mulai catat transaksi
+        </button>
+        <button onClick={onClose} className="w-full mt-2 py-2 rounded-xl" style={{ background: "var(--bg-muted)", color: "var(--text-muted)", fontSize: 12, fontWeight: 600 }}>
+          Lewati
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------------- Beranda --------------------------------- */
 
 function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd }) {
@@ -484,10 +690,10 @@ const catBreakdown = useMemo(() => {
           <EmptyState icon={PieIcon} title="Belum ada transaksi bulan ini" subtitle="Catat pemasukan & pengeluaranmu untuk melihat grafiknya di sini." />
         ) : (
           <div className="flex items-center gap-3 mt-2">
-            <div style={{ width: 84, height: 84, flexShrink: 0 }}>
+            <div style={{ width: 112, height: 112, flexShrink: 0 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={catBreakdown} dataKey="value" nameKey="name" innerRadius={26} outerRadius={40} paddingAngle={3} stroke="none">
+                  <Pie data={catBreakdown} dataKey="value" nameKey="name" innerRadius={36} outerRadius={54} paddingAngle={3} stroke="none">
                     {catBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
                 </PieChart>
@@ -599,6 +805,8 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
   const [confirmId, setConfirmId] = useState(null);
   const [query, setQuery] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
+  const debouncedQuery = useDebouncedValue(query, 250);
 
   const periodRange = useMemo(() => {
     if (period === "month") return monthRange(0);
@@ -608,7 +816,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
   }, [period, startDate, endDate]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     let list = [...modeTx];
     if (filter !== "all") list = list.filter((t) => t.type === filter);
     if (periodRange?.start) list = list.filter((t) => t.date >= periodRange.start && t.date <= periodRange.end);
@@ -623,7 +831,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
       });
     }
     return list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.createdAt - a.createdAt));
-  }, [modeTx, filter, periodRange, query, members]);
+  }, [modeTx, filter, periodRange, debouncedQuery, members]);
 
   const summary = useMemo(() => filtered.reduce((total, t) => {
     total[t.type === "in" ? "income" : "expense"] += t.amount;
@@ -705,7 +913,20 @@ const grouped = useMemo(() => {
             <option value="all">Semua waktu</option><option value="month">Bulan ini</option><option value="lastMonth">Bulan lalu</option><option value="custom">Pilih rentang</option>
           </select>
         </div>
-        {period === "custom" && <div className="flex items-center gap-2 mt-3"><input type="date" value={startDate} max={endDate || todayISO()} onChange={(e) => setStartDate(e.target.value)} aria-label="Tanggal mulai" className="min-w-0 flex-1 rounded-lg px-2 py-1.5 outline-none" style={{ background: "var(--bg-muted)", color: "var(--text-primary)", fontSize: 11 }} /><span style={{ color: "var(--text-muted)", fontSize: 11 }}>s/d</span><input type="date" value={endDate} min={startDate} max={todayISO()} onChange={(e) => setEndDate(e.target.value)} aria-label="Tanggal selesai" className="min-w-0 flex-1 rounded-lg px-2 py-1.5 outline-none" style={{ background: "var(--bg-muted)", color: "var(--text-primary)", fontSize: 11 }} /></div>}
+        {period === "custom" && (
+          <>
+            <button onClick={() => setRangeSheetOpen(true)} className="w-full mt-3 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5"
+              style={{ background: "var(--bg-muted)", color: "var(--blue)", fontSize: 11, fontWeight: 600 }}>
+              <Calendar size={12} />
+              <span className="truncate">{formatDateShort(startDate)} — {formatDateShort(endDate)}</span>
+            </button>
+            {rangeSheetOpen && (
+              <CalendarSheet mode="range" initial={{ start: startDate, end: endDate }} maxDate={todayISO()}
+                onClose={() => setRangeSheetOpen(false)}
+                onConfirm={({ start, end }) => { setStartDate(start); setEndDate(end); setRangeSheetOpen(false); }} />
+            )}
+          </>
+        )}
 <div className="grid grid-cols-3 gap-2 mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
           <div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Pemasukan</p><p style={{ color: "var(--positive)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income)}</p></div><div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Pengeluaran</p><p style={{ color: "var(--negative)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.expense)}</p></div><div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Selisih</p><p style={{ color: summary.income - summary.expense >= 0 ? "var(--blue)" : "var(--negative)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income - summary.expense)}</p></div>
         </div>
@@ -1141,7 +1362,7 @@ function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onA
   const [managing, setManaging] = useState(false);
   const [form, setForm] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const dateInputRef = useRef(null);
+  const [showCalendar, setShowCalendar] = useState(false);
   const amount = parseInt(amountStr || "0", 10);
   const cats = categories.filter((c) => c.type === type);
 
@@ -1340,11 +1561,10 @@ function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onA
         )}
 
         <div className="flex items-center gap-2 mb-4">
-          <button onClick={() => (dateInputRef.current && dateInputRef.current.showPicker ? dateInputRef.current.showPicker() : dateInputRef.current.click())} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}>
+          <button onClick={() => setShowCalendar(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}>
             <Calendar size={12} color="var(--blue)" />
             <span style={{ color: "var(--text-primary)", fontSize: 11 }}>{formatDateShort(date)}</span>
           </button>
-          <input ref={dateInputRef} type="date" value={date} max={todayISO()} onChange={(e) => setDate(e.target.value)} style={{ position: "absolute", opacity: 0, width: 0, height: 0 }} />
           {!showNote ? <button onClick={() => setShowNote(true)} style={{ color: "var(--text-muted)", fontSize: 11 }}>+ Tambah catatan</button> : null}
         </div>
         {showNote && (
@@ -1358,6 +1578,10 @@ function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onA
           {saving ? "Menyimpan..." : editingTx ? "Simpan perubahan" : "Simpan transaksi"}
         </button>
       </div>
+      {showCalendar && (
+        <CalendarSheet mode="single" initial={date} maxDate={todayISO()} onClose={() => setShowCalendar(false)}
+          onConfirm={(iso) => { setDate(iso); setShowCalendar(false); }} />
+      )}
     </div>
   );
 }
@@ -1434,6 +1658,7 @@ export default function BqFinanceApp({ session }) {
   const [displayName, setDisplayName] = useState(() => localStorage.getItem("bqfinance_name_" + userId) || nameFromEmail(userEmail));
   const [cropSrc, setCropSrc] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem("bqfinance_onboarded_" + userId));
   const [installEvent, setInstallEvent] = useState(null);
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
   const scrollRef = useRef(null);
@@ -1523,7 +1748,7 @@ export default function BqFinanceApp({ session }) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("bq_finance_theme", theme);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", "#00ab6b");
+    if (meta) meta.setAttribute("content", theme === "dark" ? "#121212" : "#00ab6b");
   }, [theme]);
 
   useEffect(() => {
@@ -1586,11 +1811,6 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     setQuickAddOpen(true);
   }, []);
 
-  const handleDeleteFromDetail = useCallback((id) => {
-    setDetailTx(null);
-    handleDeleteTransaction(id);
-  }, [handleDeleteTransaction]);
-
   const handleDeleteTransaction = useCallback(async (id) => {
     const target = transactions.find((t) => t.id === id);
     const prev = transactions;
@@ -1629,6 +1849,11 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       toast.error("Gagal menghapus transaksi.");
     }
   }, [transactions, userId]);
+
+  const handleDeleteFromDetail = useCallback((id) => {
+    setDetailTx(null);
+    handleDeleteTransaction(id);
+  }, [handleDeleteTransaction]);
 
   const handleClearData = useCallback(async () => {
     const prev = transactions;
@@ -1772,6 +1997,11 @@ async function handleSignOut() {
     localStorage.removeItem("bqfinance_avatar_" + userId);
   }
 
+  function dismissOnboarding() {
+    localStorage.setItem("bqfinance_onboarded_" + userId, "1");
+    setShowOnboarding(false);
+  }
+
   function handleNameChange(next) {
     const clean = (next || "").trim();
     const final = clean || nameFromEmail(userEmail);
@@ -1882,6 +2112,7 @@ return (
           </button>
         )}
 
+        {showOnboarding && <OnboardingSheet onClose={dismissOnboarding} />}
         {quickAddOpen && <QuickAddSheet mode={mode} members={members} categories={categories} editingTx={editingTx} onClose={() => { setQuickAddOpen(false); setEditingTx(null); }} onSave={handleSaveTransaction} saving={saving} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
         {detailTx && <TxDetailSheet tx={detailTx} members={members} onClose={() => setDetailTx(null)} onEdit={handleEditFromDetail} onDelete={handleDeleteFromDetail} />}
         {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} email={userEmail} avatar={avatar} name={displayName} onFileSelect={handleAvatarFile} onRemoveAvatar={handleRemoveAvatar} />}

@@ -3,11 +3,11 @@ import React from "react";
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, errorMessage: null };
   }
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, errorMessage: error && error.message ? error.message : null };
   }
 
   componentDidCatch(error, info) {
@@ -32,6 +32,11 @@ export default class ErrorBoundary extends React.Component {
             <p style={{ color: "var(--text-muted)", fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
               Terjadi kesalahan yang tidak terduga. Muat ulang aplikasi untuk melanjutkan.
             </p>
+            {this.state.errorMessage && (
+              <p style={{ marginTop: 12, padding: "8px 10px", borderRadius: 10, background: "var(--bg-muted)", color: "var(--text-secondary)", fontFamily: "monospace", fontSize: 10.5, lineHeight: 1.5, wordBreak: "break-all", textAlign: "left" }}>
+                {this.state.errorMessage}
+              </p>
+            )}
             <button
               onClick={this.handleReload}
               className="w-full mt-5 py-3 rounded-2xl"
