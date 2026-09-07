@@ -1,7 +1,7 @@
 import React from "react";
 import AuthGate from "./components/AuthGate.jsx";
 import BqFinanceApp from "./components/BqFinanceApp.jsx";
-import logoUrl from "./assets/bq-logo-full.png";
+import logoUrl from "./assets/logo bq-finance.png";
 
 export default function App() {
   React.useEffect(() => {

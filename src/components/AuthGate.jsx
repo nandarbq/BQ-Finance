@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { Eye, EyeOff } from "lucide-react";
-import logoUrl from "../assets/bq-logo-full.png";
+import logoUrl from "../assets/logo bq-finance.png";
 
 export default function AuthGate({ children }) {
   const [session, setSession] = useState(null);
@@ -61,7 +61,12 @@ export default function AuthGate({ children }) {
   if (checking) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
-        <span style={{ color: "var(--text-muted)", fontSize: 12, fontFamily: "Inter, sans-serif" }}>Memuat...</span>
+        <div
+          className="flex items-center justify-center bqfinance-logo-pop"
+          style={{ width: 96, height: 96, borderRadius: 26, overflow: "hidden", background: "var(--bg-surface)", boxShadow: "0 12px 40px var(--shadow)" }}
+        >
+          <img src={logoUrl} alt="BQ Finance" className="bqfinance-logo-breathe" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        </div>
       </div>
     );
   }
@@ -72,7 +77,7 @@ export default function AuthGate({ children }) {
         <div className="w-full" style={{ maxWidth: 360 }}>
           <div className="flex flex-col items-center mb-6">
             <div
-              className="flex items-center justify-center mb-3"
+              className="flex items-center justify-center mb-3 bqfinance-logo-pop"
               style={{ width: 88, height: 88, borderRadius: 22, overflow: "hidden", background: "var(--bg-surface)" }}
             >
               <img src={logoUrl} alt="BQ Finance" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
