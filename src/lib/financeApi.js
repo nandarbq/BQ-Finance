@@ -53,6 +53,24 @@ export async function deleteTransactionById(id) {
   if (error) throw error;
 }
 
+export async function updateTransaction(id, draft) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .update({
+      type: draft.type,
+      amount: draft.amount,
+      category: draft.category,
+      note: draft.note || "",
+      date: draft.date,
+      member_id: draft.memberId || null,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToTx(data);
+}
+
 export async function deleteTransactionsByMode(userId, mode) {
   const { error } = await supabase.from("transactions").delete().eq("user_id", userId).eq("mode", mode);
   if (error) throw error;

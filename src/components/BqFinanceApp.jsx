@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import { supabase } from "../lib/supabaseClient";
 import {
-  fetchTransactions, insertTransaction, deleteTransactionById, deleteTransactionsByMode,
+  fetchTransactions, insertTransaction, updateTransaction, deleteTransactionById, deleteTransactionsByMode,
   fetchMembers, insertMember, deleteMemberById,
   fetchBudgets, upsertBudget, deleteBudgetById,
   fetchCategories, insertCategory, updateCategory, deleteCategory,
@@ -528,7 +528,7 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Transaksi -------------------------------- */
 
-function TabTransaksi({ modeTx, members, mode, displayName, onDelete, categories }) {
+function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, categories }) {
   const [filter, setFilter] = useState("all");
   const [period, setPeriod] = useState("month");
   const [startDate, setStartDate] = useState(monthRange(0).start);
@@ -678,6 +678,7 @@ const grouped = useMemo(() => {
                         <span style={{ color: t.type === "in" ? "var(--positive)" : "var(--negative)", fontSize: 12.5, fontWeight: 700 }}>
                           {t.type === "in" ? "+" : "-"}{formatRupiah(t.amount)}
                         </span>
+                        <button onClick={() => onEdit(t)} aria-label={"Edit transaksi " + meta.label} className="p-1.5 rounded-lg"><Pencil size={13} color="var(--text-faint)" /></button>
                         <button onClick={() => setConfirmId(t.id)} className="p-1.5 rounded-lg"><Trash2 size={13} color="var(--text-faint)" /></button>
                       </>
                     ) : (
@@ -847,6 +848,8 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
   const [showAddBudget, setShowAddBudget] = useState(false);
   const [budgetCat, setBudgetCat] = useState(null);
   const [budgetAmount, setBudgetAmount] = useState("");
+  const [confirmBudgetId, setConfirmBudgetId] = useState(null);
+  const [confirmMemberId, setConfirmMemberId] = useState(null);
 
   const memberTotals = useMemo(() => members.map((m) => {
     const spent = modeTx.filter((t) => t.memberId === m.id && t.type === "out").reduce((s, t) => s + t.amount, 0);
@@ -948,6 +951,7 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
             {modeBudgets.map((b) => {
               const meta = getCatMeta("out", b.category);
               const Icon = meta.icon;
+              const isConfirmBudget = confirmBudgetId === b.id;
               return (
                 <div key={b.id} className="flex items-center gap-2.5">
                   <div className="flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, background: "color-mix(in srgb, " + meta.color + " 15%, transparent)" }}>
@@ -957,7 +961,14 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
                     <p style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }} className="truncate">{meta.label}</p>
                     <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>{formatRupiah(b.amount)} / bulan</p>
                   </div>
-                  <button onClick={() => onDeleteBudget(b.id)} className="p-1.5"><Trash2 size={13} color="var(--text-faint)" /></button>
+                  {!isConfirmBudget ? (
+                    <button onClick={() => setConfirmBudgetId(b.id)} className="p-1.5"><Trash2 size={13} color="var(--text-faint)" /></button>
+                  ) : (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button onClick={() => { onDeleteBudget(b.id); setConfirmBudgetId(null); }} className="px-2 py-1 rounded-lg" style={{ background: "var(--negative)", color: "var(--bg-app)", fontSize: 10, fontWeight: 700 }}>Hapus</button>
+                      <button onClick={() => setConfirmBudgetId(null)} className="px-2 py-1 rounded-lg" style={{ background: "var(--bg-selected)", color: "var(--text-secondary)", fontSize: 10, fontWeight: 600 }}>Batal</button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1011,16 +1022,27 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
             </div>
           )}
           <div className="flex flex-col gap-2">
-            {memberTotals.map((m) => (
-              <div key={m.id} className="flex items-center gap-2.5">
-                <Avatar name={m.name} color={m.color} size={30} />
-                <div className="flex-1 min-w-0">
-                  <p style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }} className="truncate">{m.name}</p>
-                  <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Pengeluaran: {formatRupiah(m.spent)}</p>
+            {memberTotals.map((m) => {
+              const isConfirmMember = confirmMemberId === m.id;
+              return (
+                <div key={m.id} className="flex items-center gap-2.5">
+                  <Avatar name={m.name} color={m.color} size={30} />
+                  <div className="flex-1 min-w-0">
+                    <p style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }} className="truncate">{m.name}</p>
+                    <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Pengeluaran: {formatRupiah(m.spent)}</p>
+                  </div>
+                  {!m.builtIn && !isConfirmMember && (
+                    <button onClick={() => setConfirmMemberId(m.id)} className="p-1.5"><Trash2 size={13} color="var(--text-faint)" /></button>
+                  )}
+                  {!m.builtIn && isConfirmMember && (
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button onClick={() => { onDeleteMember(m.id); setConfirmMemberId(null); }} className="px-2 py-1 rounded-lg" style={{ background: "var(--negative)", color: "var(--bg-app)", fontSize: 10, fontWeight: 700 }}>Hapus</button>
+                      <button onClick={() => setConfirmMemberId(null)} className="px-2 py-1 rounded-lg" style={{ background: "var(--bg-selected)", color: "var(--text-secondary)", fontSize: 10, fontWeight: 600 }}>Batal</button>
+                    </div>
+                  )}
                 </div>
-                {!m.builtIn && <button onClick={() => onDeleteMember(m.id)} className="p-1.5"><Trash2 size={13} color="var(--text-faint)" /></button>}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1045,14 +1067,14 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
 
 /* ------------------------------ Quick Add Sheet ----------------------------- */
 
-function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onAddCategory, onUpdateCategory, onDeleteCategory }) {
-  const [type, setType] = useState("out");
-  const [amountStr, setAmountStr] = useState("");
-  const [category, setCategory] = useState(null);
-  const [memberId, setMemberId] = useState(members[0] ? members[0].id : null);
-  const [note, setNote] = useState("");
-  const [showNote, setShowNote] = useState(false);
-  const [date, setDate] = useState(todayISO());
+function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onAddCategory, onUpdateCategory, onDeleteCategory, editingTx }) {
+  const [type, setType] = useState(editingTx ? editingTx.type : "out");
+  const [amountStr, setAmountStr] = useState(editingTx ? String(editingTx.amount) : "");
+  const [category, setCategory] = useState(editingTx ? editingTx.category : null);
+  const [memberId, setMemberId] = useState(editingTx?.memberId || (members[0] ? members[0].id : null));
+  const [note, setNote] = useState(editingTx ? editingTx.note || "" : "");
+  const [showNote, setShowNote] = useState(editingTx ? !!(editingTx.note) : false);
+  const [date, setDate] = useState(editingTx ? editingTx.date : todayISO());
   const [managing, setManaging] = useState(false);
   const [form, setForm] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
@@ -1100,7 +1122,7 @@ function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onA
       <div className="absolute inset-0 bqfinance-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
       <div className="relative bqfinance-sheet-up rounded-t-3xl px-4 pt-4 pb-5 max-h-[88%] overflow-y-auto" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
         <div className="flex items-center justify-between mb-3">
-          <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>{type === "out" ? "Catat pengeluaran" : "Catat pemasukan"}</p>
+          <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>{editingTx ? "Edit " + (type === "out" ? "pengeluaran" : "pemasukan") : (type === "out" ? "Catat pengeluaran" : "Catat pemasukan")}</p>
           <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
         </div>
 
@@ -1270,7 +1292,7 @@ function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onA
         <button onClick={handleSave} disabled={!canSave} className="w-full py-3 rounded-2xl flex items-center justify-center gap-1.5"
           style={{ background: !canSave ? "var(--bg-selected)" : type === "out" ? "var(--negative)" : "var(--positive)", color: !canSave ? "var(--text-faint)" : "var(--bg-app)", fontSize: 13, fontWeight: 700 }}>
           <Check size={15} />
-          {saving ? "Menyimpan..." : "Simpan transaksi"}
+          {saving ? "Menyimpan..." : editingTx ? "Simpan perubahan" : "Simpan transaksi"}
         </button>
       </div>
     </div>
@@ -1290,7 +1312,8 @@ export default function BqFinanceApp({ session }) {
   const [budgets, setBudgets] = useState([]);
   const [categories, setCategories] = useState([]);
   const [activeTab, setActiveTab] = useState("beranda");
-const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("bq_finance_theme") || "light");
@@ -1357,16 +1380,32 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
   const handleSaveTransaction = useCallback(async (draft) => {
     setSaving(true);
     try {
-      const tx = await insertTransaction(userId, draft);
-      setTransactions((prev) => [tx, ...prev]);
+      if (editingTx) {
+        const updated = await updateTransaction(editingTx.id, draft);
+        setTransactions((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      } else {
+        const tx = await insertTransaction(userId, draft);
+        setTransactions((prev) => [tx, ...prev]);
+      }
       setQuickAddOpen(false);
+      setEditingTx(null);
     } catch (e) {
       console.error(e);
-      alert("Gagal menyimpan transaksi. Coba lagi.");
+      toast.error("Gagal menyimpan transaksi. Coba lagi.");
     } finally {
       setSaving(false);
     }
-  }, [userId]);
+  }, [userId, editingTx]);
+
+  const openQuickAdd = useCallback(() => {
+    setEditingTx(null);
+    setQuickAddOpen(true);
+  }, []);
+
+  const openQuickEdit = useCallback((tx) => {
+    setEditingTx(tx);
+    setQuickAddOpen(true);
+  }, []);
 
   const handleDeleteTransaction = useCallback(async (id) => {
     const prev = transactions;
@@ -1376,7 +1415,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     } catch (e) {
       console.error(e);
       setTransactions(prev);
-      alert("Gagal menghapus transaksi.");
+      toast.error("Gagal menghapus transaksi.");
     }
   }, [transactions]);
 
@@ -1388,7 +1427,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     } catch (e) {
       console.error(e);
       setTransactions(prev);
-      alert("Gagal menghapus data.");
+      toast.error("Gagal menghapus data.");
     }
   }, [transactions, mode, userId]);
 
@@ -1399,7 +1438,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       setMembers((prev) => [...prev, m]);
     } catch (e) {
       console.error(e);
-      alert("Gagal menambah anggota.");
+      toast.error("Gagal menambah anggota.");
     }
   }, [userId]);
 
@@ -1411,7 +1450,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     } catch (e) {
       console.error(e);
       setMembers(prev);
-      alert("Gagal menghapus anggota.");
+      toast.error("Gagal menghapus anggota.");
     }
   }, [members]);
 
@@ -1425,7 +1464,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       });
     } catch (e) {
       console.error(e);
-      alert("Gagal menyimpan anggaran.");
+      toast.error("Gagal menyimpan anggaran.");
     }
   }, [userId, mode]);
 
@@ -1437,7 +1476,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     } catch (e) {
       console.error(e);
       setBudgets(prev);
-      alert("Gagal menghapus anggaran.");
+      toast.error("Gagal menghapus anggaran.");
     }
   }, [budgets]);
 
@@ -1450,7 +1489,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       setCategoriesRef(next);
     } catch (e) {
       console.error(e);
-      alert("Gagal menambah kategori.");
+      toast.error("Gagal menambah kategori.");
     }
   }, [userId, categories]);
 
@@ -1465,7 +1504,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       console.error(e);
       setCategories(prev);
       setCategoriesRef(prev);
-      alert("Gagal mengubah kategori.");
+      toast.error("Gagal mengubah kategori.");
     }
   }, [categories]);
 
@@ -1480,7 +1519,7 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       console.error(e);
       setCategories(prev);
       setCategoriesRef(prev);
-      alert("Gagal menghapus kategori.");
+      toast.error("Gagal menghapus kategori.");
     }
   }, [categories]);
 
@@ -1502,11 +1541,11 @@ async function handleSignOut() {
 
   function handleAvatarFile(file) {
     if (!file || !file.type.startsWith("image/")) {
-      alert("Pilih file gambar untuk foto profil.");
+      toast.error("Pilih file gambar untuk foto profil.");
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => alert("Gagal memuat foto. Coba gunakan gambar lain.");
+    reader.onerror = () => toast.error("Gagal memuat foto. Coba gunakan gambar lain.");
     reader.onload = () => setCropSrc(reader.result);
     reader.readAsDataURL(file);
   }
@@ -1594,8 +1633,8 @@ return (
             <div className="flex items-center justify-center h-full px-6 text-center"><span style={{ color: "var(--negative)", fontSize: 12 }}>{loadError}</span></div>
           ) : (
             <div key={activeTab} className="bqfinance-tabfade">
-              {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} modeBudgets={modeBudgets} members={members} setActiveTab={setActiveTab} openQuickAdd={() => setQuickAddOpen(true)} />}
-              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} categories={categories} />}
+              {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} modeBudgets={modeBudgets} members={members} setActiveTab={setActiveTab} openQuickAdd={openQuickAdd} />}
+              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} onEdit={openQuickEdit} categories={categories} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
                 <TabPengaturan mode={mode} members={members} modeTx={modeTx} modeBudgets={modeBudgets} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} categories={categories} />
@@ -1623,13 +1662,13 @@ return (
         </div>
 
         {(activeTab === "beranda" || activeTab === "transaksi") && (
-          <button onClick={() => setQuickAddOpen(true)} className="absolute flex items-center justify-center transition-transform active:scale-90"
+          <button onClick={openQuickAdd} className="absolute flex items-center justify-center transition-transform active:scale-90"
             style={{ width: 52, height: 52, borderRadius: 999, right: 18, bottom: 74, background: "linear-gradient(135deg,var(--blue-light),var(--blue))", boxShadow: "0 8px 22px rgba(0,171,107,0.4)" }}>
             <Plus size={22} color="var(--bg-app)" strokeWidth={2.6} />
           </button>
         )}
 
-        {quickAddOpen && <QuickAddSheet mode={mode} members={members} categories={categories} onClose={() => setQuickAddOpen(false)} onSave={handleSaveTransaction} saving={saving} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
+        {quickAddOpen && <QuickAddSheet mode={mode} members={members} categories={categories} editingTx={editingTx} onClose={() => { setQuickAddOpen(false); setEditingTx(null); }} onSave={handleSaveTransaction} saving={saving} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
         {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} email={userEmail} avatar={avatar} name={displayName} onFileSelect={handleAvatarFile} onRemoveAvatar={handleRemoveAvatar} />}
         {cropSrc && <CropSheet src={cropSrc} onClose={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
       </div>

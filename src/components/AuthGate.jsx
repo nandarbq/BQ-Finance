@@ -46,6 +46,22 @@ export default function AuthGate({ children }) {
     setSubmitting(false);
   }
 
+  async function handleResetPassword() {
+    if (!email) {
+      setError("Masukkan email kamu terlebih dahulu.");
+      return;
+    }
+    setError("");
+    setInfo("");
+    setSubmitting(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    setSubmitting(false);
+    if (error) setError(error.message);
+    else setInfo("📧 Link reset kata sandi sudah dikirim ke email kamu. Cek juga folder spam.");
+  }
+
   async function handleGoogleAuth() {
     setError("");
     setInfo("");
@@ -135,6 +151,17 @@ export default function AuthGate({ children }) {
             </div>
             {error && <p style={{ color: "var(--negative)", fontSize: 11.5 }}>{error}</p>}
             {info && <p style={{ color: "var(--positive)", fontSize: 11.5 }}>{info}</p>}
+            {mode === "signin" && (
+              <button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={submitting}
+                className="self-end"
+                style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 11.5, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1, marginTop: -4 }}
+              >
+                Lupa kata sandi?
+              </button>
+            )}
             <button
               type="submit"
               disabled={submitting}
