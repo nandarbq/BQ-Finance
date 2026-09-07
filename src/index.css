@@ -119,3 +119,15 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.65; }
 @media (prefers-reduced-motion: reduce) {
   .bqfinance-logo-pop, .bqfinance-logo-breathe { animation: none; }
 }
+
+@keyframes bqfinance-toast-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.bqfinance-toast-spin {
+  animation: bqfinance-toastspin 0.8s linear infinite;
+}
+@keyframes bqfinance-toastspin {
+  to { transform: rotate(360deg); }
+}

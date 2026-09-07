@@ -7,8 +7,9 @@ import {
   Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon, Camera,
   ZoomIn, ZoomOut, Pencil, FileDown, Download, WifiOff, Search, Target,
   Trophy, BookOpen, Plane, Music, Dumbbell, PawPrint, Baby, Coffee,
-  Wifi, Zap, ShieldCheck, Landmark, Phone, Shirt, Stethoscope,
+  Wifi, Zap, ShieldCheck, Landmark, Phone, Shirt, Stethoscope, Loader2,
 } from "lucide-react";
+import { toast } from "./Toast";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
   BarChart, Bar, XAxis, YAxis,
@@ -534,6 +535,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, categories
   const [endDate, setEndDate] = useState(todayISO());
   const [confirmId, setConfirmId] = useState(null);
   const [query, setQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const periodRange = useMemo(() => {
     if (period === "month") return monthRange(0);
@@ -580,17 +582,31 @@ const grouped = useMemo(() => {
 
   async function handleExportPdf() {
     if (filtered.length === 0) {
-      alert("Tidak ada transaksi untuk diekspor. Periksa kembali periode dan filter.");
+      toast.error("Tidak ada transaksi untuk diekspor. Periksa kembali periode dan filter.");
       return;
     }
-    await exportTransactionPdf({
-      transactions: filtered,
-      members,
-      mode,
-      periodLabel: periodLabel(),
-      displayName,
-      categories,
-    });
+    setExporting(true);
+    const id = toast.loading("Membuat PDF...");
+    try {
+      await Promise.race([
+        exportTransactionPdf({
+          transactions: filtered,
+          members,
+          mode,
+          periodLabel: periodLabel(),
+          displayName,
+          categories,
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 20000)
+        ),
+      ]);
+      toast.resolve(id, "success", "PDF berhasil diunduh");
+    } catch (err) {
+      toast.resolve(id, "error", "Gagal membuat PDF. Coba lagi.");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -630,9 +646,9 @@ const grouped = useMemo(() => {
 <div className="grid grid-cols-3 gap-2 mt-3 pt-3" style={{ borderTop: "1px solid var(--border)" }}>
           <div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Pemasukan</p><p style={{ color: "var(--positive)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income)}</p></div><div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Pengeluaran</p><p style={{ color: "var(--negative)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.expense)}</p></div><div><p style={{ color: "var(--text-muted)", fontSize: 9.5 }}>Selisih</p><p style={{ color: summary.income - summary.expense >= 0 ? "var(--blue)" : "var(--negative)", fontSize: 11, fontWeight: 700 }}>{formatRupiah(summary.income - summary.expense)}</p></div>
         </div>
-        <button onClick={handleExportPdf} className="w-full mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2"
-          style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 11.5, fontWeight: 700 }}>
-          <FileDown size={13} />Export PDF
+        <button onClick={handleExportPdf} disabled={exporting} className="w-full mt-3 flex items-center justify-center gap-1.5 rounded-xl py-2"
+          style={{ background: exporting ? "var(--blue-soft)" : "var(--blue)", color: exporting ? "var(--blue)" : "var(--bg-app)", fontSize: 11.5, fontWeight: 700, cursor: exporting ? "default" : "pointer" }}>
+          {exporting ? <><Loader2 size={13} className="bqfinance-toast-spin" />Membuat PDF...</> : <><FileDown size={13} />Export PDF</>}
         </button>
       </div>
 

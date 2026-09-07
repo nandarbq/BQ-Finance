@@ -1,23 +1,6 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
-import logoUrl from "../assets/logo bq-finance.png";
-
-let logoDataUrlPromise;
-
-function getLogoDataUrl() {
-  if (!logoDataUrlPromise) {
-    logoDataUrlPromise = fetch(logoUrl)
-      .then((response) => response.blob())
-      .then((blob) => new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      }))
-      .catch(() => null);
-  }
-  return logoDataUrlPromise;
-}
+import logoDataUrl from "../assets/logo bq-finance.png?inline";
 
 const CAT_LABELS = {
   in: {
@@ -71,7 +54,6 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const marginX = 42;
-  const logoDataUrl = await getLogoDataUrl();
 
   const memberName = (id) => {
     const m = members.find((x) => x.id === id);
@@ -201,5 +183,15 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
   }
 
   const safeName = (periodLabel || "periode").replace(/[^a-z0-9]+/gi, "-").toLowerCase().trim().replace(/^-+|-+$/g, "") || "periode";
-  doc.save("Laporan-Transaksi-" + safeName + ".pdf");
+  const fileName = "Laporan-Transaksi-" + safeName + ".pdf";
+
+  const blob = doc.output("blob");
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
