@@ -116,10 +116,6 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.65; }
   50% { transform: scale(1.05); }
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .bqfinance-logo-pop, .bqfinance-logo-breathe { animation: none; }
 }
