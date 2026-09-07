@@ -1604,7 +1604,7 @@ return (
           )}
         </div>
 
-        <div className="relative flex-shrink-0 flex items-center justify-around px-2 pt-2" style={{ background: "var(--bg-app)", borderTop: "1px solid var(--bg-muted)" }}>
+        <div className="relative flex-shrink-0 flex items-center pt-2" style={{ background: "var(--bg-app)", borderTop: "1px solid var(--bg-muted)", paddingBottom: "env(safe-area-inset-bottom, 6px)" }}>
           {[
             { id: "beranda", label: "Beranda", icon: Home },
             { id: "transaksi", label: "Transaksi", icon: ListChecks },
@@ -1614,13 +1614,12 @@ return (
             const Icon = t.icon;
             const active = activeTab === t.id;
             return (
-              <button key={t.id} onClick={() => setActiveTab(t.id)} className="flex flex-col items-center gap-0.5 py-2 px-2">
+              <button key={t.id} onClick={() => setActiveTab(t.id)} className="flex-1 flex flex-col items-center gap-0.5 py-2">
                 <Icon size={18} color={active ? "var(--blue)" : "var(--text-faint)"} strokeWidth={active ? 2.4 : 2} />
                 <span style={{ color: active ? "var(--blue)" : "var(--text-faint)", fontSize: 9.5, fontWeight: 600 }}>{t.label}</span>
               </button>
             );
           })}
-          <div style={{ paddingBottom: "env(safe-area-inset-bottom, 6px)" }} />
         </div>
 
         {(activeTab === "beranda" || activeTab === "transaksi") && (
