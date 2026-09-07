@@ -8,7 +8,7 @@ export default function App() {
     const theme = localStorage.getItem("bq_finance_theme") || "light";
     document.documentElement.dataset.theme = theme;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "dark" ? "#121212" : "#ffffff");
+    if (meta) meta.setAttribute("content", "#00ab6b");
     let favicon = document.querySelector('link[rel="icon"]');
     if (!favicon) {
       favicon = document.createElement("link");

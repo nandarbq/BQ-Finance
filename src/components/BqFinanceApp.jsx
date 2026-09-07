@@ -947,7 +947,7 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("bq_finance_theme", theme);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", theme === "dark" ? "#121212" : "#ffffff");
+    if (meta) meta.setAttribute("content", "#00ab6b");
   }, [theme]);
 
   useEffect(() => {
