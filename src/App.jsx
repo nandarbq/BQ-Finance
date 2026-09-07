@@ -1,6 +1,7 @@
 import React from "react";
 import AuthGate from "./components/AuthGate.jsx";
 import BqFinanceApp from "./components/BqFinanceApp.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import logoUrl from "./assets/logo bq-finance.png";
 
 export default function App() {
@@ -19,5 +20,9 @@ export default function App() {
     favicon.href = logoUrl;
   }, []);
 
-  return <AuthGate>{(session) => <BqFinanceApp session={session} />}</AuthGate>;
+  return (
+    <ErrorBoundary>
+      <AuthGate>{(session) => <BqFinanceApp session={session} />}</AuthGate>
+    </ErrorBoundary>
+  );
 }

@@ -36,7 +36,7 @@ function setTimer(id, fn, ms) {
 
 function push(type, message, opts = {}) {
   const id = (opts.id ?? "toast") + "-" + ++nextId;
-  setToasts((prev) => [...prev, { id, type, message }]);
+  setToasts((prev) => [...prev, { id, type, message, action: opts.action }]);
   const duration =
     type === "loading" ? opts.loadingMs ?? 12000 : opts.duration ?? 2600;
   setTimer(id, () => dismiss(id), duration);
@@ -103,7 +103,7 @@ function Toast({ toast, onDismiss }) {
 
   return (
     <div
-      onClick={toast.type === "success" || toast.type === "error" ? onDismiss : undefined}
+      onClick={!(toast.action) && (toast.type === "success" || toast.type === "error") ? onDismiss : undefined}
       role={toast.type === "success" || toast.type === "error" ? "status" : undefined}
       style={{
         display: "flex",
@@ -130,6 +130,14 @@ function Toast({ toast, onDismiss }) {
         <X size={16} color="var(--negative)" />
       )}
       <span style={{ color: "var(--text-primary)" }}>{toast.message}</span>
+      {toast.action && (
+        <button
+          onClick={(e) => { e.stopPropagation(); toast.action.onClick(); onDismiss(); }}
+          style={{ background: "var(--blue)", color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", flexShrink: 0, marginLeft: 4 }}
+        >
+          {toast.action.label}
+        </button>
+      )}
     </div>
   );
 }

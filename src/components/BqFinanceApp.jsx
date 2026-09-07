@@ -343,6 +343,69 @@ function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvat
   );
 }
 
+function TxDetailSheet({ tx, members, onClose, onEdit, onDelete }) {
+  const meta = getCatMeta(tx.type, tx.category);
+  const Icon = meta.icon;
+  const member = members.find((m) => m.id === tx.memberId);
+  const fullDate = new Date(tx.date + "T00:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  return (
+    <div className="absolute inset-0 z-45 flex flex-col justify-end">
+      <div className="absolute inset-0 bqfinance-fade-in" style={{ background: "rgba(5,10,8,0.6)" }} onClick={onClose} />
+      <div className="relative bqfinance-sheet-up rounded-t-3xl px-5 pt-4 pb-5" style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}>
+        <div className="flex items-center justify-between mb-4">
+          <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 15 }}>Detail transaksi</p>
+          <button onClick={onClose} className="p-1.5 rounded-full" style={{ background: "var(--bg-muted)" }}><X size={15} color="var(--text-secondary)" /></button>
+        </div>
+
+        <div className="flex flex-col items-center mb-5">
+          <div className="flex items-center justify-center" style={{ width: 56, height: 56, borderRadius: 18, background: "color-mix(in srgb, " + meta.color + " 15%, transparent)" }}>
+            <Icon size={24} color={meta.color} />
+          </div>
+          <p className="mt-3" style={{ color: "var(--text-muted)", fontSize: 12 }}>{meta.label}</p>
+          <p className="mt-1" style={{ fontFamily: "'Sora', sans-serif", color: tx.type === "in" ? "var(--positive)" : "var(--negative)", fontSize: 26, fontWeight: 700 }}>
+            {tx.type === "in" ? "+" : "-"}{formatRupiah(tx.amount)}
+          </p>
+        </div>
+
+        <div className="rounded-2xl overflow-hidden mb-5" style={{ background: "var(--bg-muted)" }}>
+          <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Jenis</span>
+            <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{tx.type === "in" ? "Pemasukan" : "Pengeluaran"}</span>
+          </div>
+          <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Kategori</span>
+            <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{meta.label}</span>
+          </div>
+          <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+            <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Tanggal</span>
+            <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{fullDate}</span>
+          </div>
+          {member && (
+            <div className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Anggota</span>
+              <span className="flex items-center gap-1.5"><Avatar name={member.name} color={member.color} size={18} /><span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{member.name}</span></span>
+            </div>
+          )}
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Catatan</span>
+            <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600, maxWidth: 200, textAlign: "right" }}>{tx.note || "—"}</span>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <button onClick={() => onDelete(tx.id)} className="flex items-center justify-center gap-1.5 flex-1 py-3 rounded-2xl" style={{ background: "var(--bg-muted)", color: "var(--negative)", fontSize: 13, fontWeight: 700 }}>
+            <Trash2 size={15} />Hapus
+          </button>
+          <button onClick={() => onEdit(tx)} className="flex items-center justify-center gap-1.5 flex-1 py-3 rounded-2xl" style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700 }}>
+            <Pencil size={15} />Edit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------------- Beranda --------------------------------- */
 
 function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd }) {
@@ -528,7 +591,7 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Transaksi -------------------------------- */
 
-function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, categories }) {
+function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, onDetail, categories }) {
   const [filter, setFilter] = useState("all");
   const [period, setPeriod] = useState("month");
   const [startDate, setStartDate] = useState(monthRange(0).start);
@@ -666,10 +729,10 @@ const grouped = useMemo(() => {
                 const isConfirm = confirmId === t.id;
                 return (
                   <div key={t.id} className="flex items-center gap-2.5 px-3.5 py-2.5" style={{ borderTop: idx === 0 ? "none" : "1px solid var(--border)" }}>
-                    <div className="flex items-center justify-center" style={{ width: 34, height: 34, borderRadius: 11, background: "color-mix(in srgb, " + meta.color + " 15%, transparent)", flexShrink: 0 }}>
+                    <div className="flex items-center justify-center" onClick={() => onDetail(t)} style={{ width: 34, height: 34, borderRadius: 11, background: "color-mix(in srgb, " + meta.color + " 15%, transparent)", flexShrink: 0, cursor: "pointer" }}>
                       <Icon size={15} color={meta.color} />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0" onClick={() => onDetail(t)} style={{ cursor: "pointer" }}>
                       <p style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }} className="truncate">{meta.label}</p>
                       <p style={{ color: "var(--text-muted)", fontSize: 10.5 }} className="truncate">{t.note ? t.note : member ? member.name : "\u00A0"}</p>
                     </div>
@@ -1301,11 +1364,60 @@ function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onA
 
 /* ---------------------------------- App ------------------------------------ */
 
+function SkeletonBlock({ style }) {
+  return <div className="bqfinance-skeleton" style={{ background: "var(--bg-muted)", borderRadius: 10, ...style }} />;
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="px-4 pt-1 pb-4">
+      <div className="rounded-3xl px-5 pt-5 pb-6 mb-4" style={{ background: "var(--bg-app)" }}>
+        <SkeletonBlock style={{ height: 12, width: 90 }} />
+        <SkeletonBlock style={{ height: 30, width: 160, marginTop: 12 }} />
+        <div className="flex items-center gap-4 mt-5">
+          <SkeletonBlock style={{ height: 34, width: 120 }} />
+          <SkeletonBlock style={{ height: 34, width: 120 }} />
+        </div>
+      </div>
+      <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
+        <SkeletonBlock style={{ height: 13, width: 160 }} />
+        <div className="flex items-center gap-3 mt-4">
+          <SkeletonBlock style={{ height: 84, width: 84, borderRadius: 999 }} />
+          <div className="flex-1">
+            <SkeletonBlock style={{ height: 22, width: "70%" }} />
+            <SkeletonBlock style={{ height: 22, width: "45%", marginTop: 8 }} />
+          </div>
+        </div>
+      </div>
+      <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
+        <SkeletonBlock style={{ height: 13, width: 140 }} />
+        <div className="flex flex-col gap-3 mt-4">
+          <SkeletonBlock style={{ height: 18, width: "100%" }} />
+          <SkeletonBlock style={{ height: 18, width: "100%" }} />
+          <SkeletonBlock style={{ height: 18, width: "100%" }} />
+        </div>
+      </div>
+      <div className="rounded-2xl p-4" style={{ background: "var(--bg-surface)" }}>
+        <SkeletonBlock style={{ height: 13, width: 130 }} />
+        <div className="flex flex-col gap-3 mt-3">
+          <SkeletonBlock style={{ height: 34, width: "100%" }} />
+          <SkeletonBlock style={{ height: 34, width: "100%" }} />
+          <SkeletonBlock style={{ height: 34, width: "100%" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BqFinanceApp({ session }) {
   const userId = session.user.id;
   const userEmail = session.user.email;
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullActive, setPullActive] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [pullHeight, setPullHeight] = useState(0);
   const [mode, setMode] = useState(() => localStorage.getItem("bqfinance_mode") || "pribadi");
   const [transactions, setTransactions] = useState([]);
   const [members, setMembers] = useState([]);
@@ -1314,6 +1426,7 @@ export default function BqFinanceApp({ session }) {
   const [activeTab, setActiveTab] = useState("beranda");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [editingTx, setEditingTx] = useState(null);
+  const [detailTx, setDetailTx] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("bq_finance_theme") || "light");
@@ -1323,6 +1436,9 @@ export default function BqFinanceApp({ session }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [installEvent, setInstallEvent] = useState(null);
   const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  const scrollRef = useRef(null);
+  const pullRef = useRef(null);
+
   const isStandalone = typeof window !== "undefined" && (
     window.matchMedia("(display-mode: standalone)").matches ||
     window.matchMedia("(display-mode: minimal-ui)").matches ||
@@ -1330,26 +1446,78 @@ export default function BqFinanceApp({ session }) {
     window.navigator.standalone
   );
 
+  const loadData = useCallback(async () => {
+    try {
+      const [tx, mem, bdgt, cats] = await Promise.all([fetchTransactions(userId), fetchMembers(userId), fetchBudgets(userId), fetchCategories(userId)]);
+      setTransactions(tx);
+      setMembers(mem);
+      setBudgets(bdgt);
+      setCategories(cats);
+      setCategoriesRef(cats);
+      setLoadError("");
+      return true;
+    } catch (e) {
+      console.error(e);
+      setLoadError("Gagal memuat data. Periksa koneksi atau konfigurasi Supabase.");
+      return false;
+    }
+  }, [userId]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
-      try {
-        const [tx, mem, bdgt, cats] = await Promise.all([fetchTransactions(userId), fetchMembers(userId), fetchBudgets(userId), fetchCategories(userId)]);
-        if (!mounted) return;
-        setTransactions(tx);
-        setMembers(mem);
-        setBudgets(bdgt);
-        setCategories(cats);
-        setCategoriesRef(cats);
-      } catch (e) {
-        console.error(e);
-        setLoadError("Gagal memuat data. Periksa koneksi atau konfigurasi Supabase.");
-      } finally {
-        if (mounted) setLoading(false);
-      }
+      if (!mounted) return;
+      await loadData();
+      if (mounted) setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [userId]);
+  }, [loadData]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const onPullStart = useCallback((e) => {
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    pullRef.current = e.touches[0].clientY;
+    setPullActive(true);
+    setPullDistance(0);
+  }, []);
+
+  const onPullMove = useCallback((e) => {
+    if (!pullRef.current) return;
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) { setPullDistance(0); return; }
+    const delta = e.touches[0].clientY - pullRef.current;
+    if (delta > 0) {
+      const dist = Math.min(delta * 0.45, 80);
+      setPullDistance(dist);
+      setPullHeight(dist);
+    } else {
+      setPullDistance(0);
+      setPullHeight(0);
+    }
+  }, []);
+
+  const onPullEnd = useCallback(() => {
+    pullRef.current = null;
+    if (pullDistance > 52) {
+      setPullHeight(46);
+      setPullActive(true);
+      handleRefresh().then(() => {
+        setPullDistance(0);
+        setPullHeight(0);
+        setPullActive(false);
+      });
+    } else {
+      setPullDistance(0);
+      setPullHeight(0);
+      setPullActive(false);
+    }
+  }, [pullDistance, handleRefresh]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -1403,21 +1571,64 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
   }, []);
 
   const openQuickEdit = useCallback((tx) => {
+    setDetailTx(null);
     setEditingTx(tx);
     setQuickAddOpen(true);
   }, []);
 
+  const openTxDetail = useCallback((tx) => {
+    setDetailTx(tx);
+  }, []);
+
+  const handleEditFromDetail = useCallback((tx) => {
+    setDetailTx(null);
+    setEditingTx(tx);
+    setQuickAddOpen(true);
+  }, []);
+
+  const handleDeleteFromDetail = useCallback((id) => {
+    setDetailTx(null);
+    handleDeleteTransaction(id);
+  }, [handleDeleteTransaction]);
+
   const handleDeleteTransaction = useCallback(async (id) => {
+    const target = transactions.find((t) => t.id === id);
     const prev = transactions;
     setTransactions((p) => p.filter((t) => t.id !== id));
     try {
       await deleteTransactionById(id);
+      if (target) {
+        toast.success("Transaksi dihapus", {
+          duration: 5000,
+          action: {
+            label: "Urungkan",
+            onClick: async () => {
+              try {
+                const restored = await insertTransaction(userId, {
+                  mode: target.mode,
+                  type: target.type,
+                  amount: target.amount,
+                  category: target.category,
+                  note: target.note || "",
+                  date: target.date,
+                  memberId: target.memberId,
+                });
+                setTransactions((p) => [...p, restored]);
+                toast.success("Transaksi dikembalikan");
+              } catch (e) {
+                console.error(e);
+                toast.error("Gagal mengembalikan transaksi.");
+              }
+            },
+          },
+        });
+      }
     } catch (e) {
       console.error(e);
       setTransactions(prev);
       toast.error("Gagal menghapus transaksi.");
     }
-  }, [transactions]);
+  }, [transactions, userId]);
 
   const handleClearData = useCallback(async () => {
     const prev = transactions;
@@ -1626,15 +1837,18 @@ return (
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto" onTouchStart={onPullStart} onTouchMove={onPullMove} onTouchEnd={onPullEnd}>
+          <div ref={pullRef} className={refreshing || pullActive ? "flex items-center justify-center py-0" : "hidden"} style={{ height: refreshing || pullActive ? pullHeight : 0, overflow: "hidden", transition: "height 0.25s ease" }}>
+            {refreshing ? <Loader2 size={18} className="bqfinance-toast-spin" color="var(--blue)" /> : pullDistance > 52 ? <span style={{ color: "var(--blue)", fontSize: 11, fontWeight: 600 }}>Lepaskan untuk muat ulang</span> : <span style={{ color: "var(--text-muted)", fontSize: 11 }}>Tarik untuk muat ulang</span>}
+          </div>
           {loading ? (
-            <div className="flex items-center justify-center h-full"><span style={{ color: "var(--text-muted)", fontSize: 12 }}>Memuat data...</span></div>
+            <LoadingSkeleton />
           ) : loadError ? (
             <div className="flex items-center justify-center h-full px-6 text-center"><span style={{ color: "var(--negative)", fontSize: 12 }}>{loadError}</span></div>
           ) : (
             <div key={activeTab} className="bqfinance-tabfade">
               {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} modeBudgets={modeBudgets} members={members} setActiveTab={setActiveTab} openQuickAdd={openQuickAdd} />}
-              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} onEdit={openQuickEdit} categories={categories} />}
+              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} onEdit={openQuickEdit} onDetail={openTxDetail} categories={categories} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
                 <TabPengaturan mode={mode} members={members} modeTx={modeTx} modeBudgets={modeBudgets} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} categories={categories} />
@@ -1669,6 +1883,7 @@ return (
         )}
 
         {quickAddOpen && <QuickAddSheet mode={mode} members={members} categories={categories} editingTx={editingTx} onClose={() => { setQuickAddOpen(false); setEditingTx(null); }} onSave={handleSaveTransaction} saving={saving} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
+        {detailTx && <TxDetailSheet tx={detailTx} members={members} onClose={() => setDetailTx(null)} onEdit={handleEditFromDetail} onDelete={handleDeleteFromDetail} />}
         {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} email={userEmail} avatar={avatar} name={displayName} onFileSelect={handleAvatarFile} onRemoveAvatar={handleRemoveAvatar} />}
         {cropSrc && <CropSheet src={cropSrc} onClose={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
       </div>

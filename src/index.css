@@ -131,3 +131,25 @@ input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.65; }
 @keyframes bqfinance-toastspin {
   to { transform: rotate(360deg); }
 }
+
+.bqfinance-skeleton {
+  position: relative;
+  overflow: hidden;
+}
+.bqfinance-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.45), transparent);
+  animation: bqfinance-shimmer 1.4s infinite;
+}
+:root[data-theme="dark"] .bqfinance-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+}
+@keyframes bqfinance-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bqfinance-skeleton::after { animation: none; }
+}
