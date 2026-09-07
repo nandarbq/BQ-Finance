@@ -14,17 +14,50 @@ export default function AuthGate({ children }) {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [confirmStatus, setConfirmStatus] = useState("idle"); // idle | processing | success | error
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setChecking(false);
+      if (window.location.hash.startsWith("#/confirm")) {
+        handleEmailConfirm();
+      }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  async function handleEmailConfirm() {
+    const params = new URLSearchParams(window.location.hash.split("?")[1] || "");
+    const tokenHash = params.get("token_hash");
+    const type = params.get("type") || "email";
+    if (!tokenHash || !window.location.hash.startsWith("#/confirm")) return;
+    setConfirmStatus("processing");
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
+    if (window.location.hash) {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    if (error) {
+      setConfirmStatus("error");
+      return;
+    }
+    setConfirmEmail(data.user?.email || "");
+    setConfirmStatus("success");
+  }
+
+  async function handleResend() {
+    if (!confirmEmail) return;
+    setResending(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email: confirmEmail });
+    setResending(false);
+    if (error) setError(error.message);
+    else setInfo("Email konfirmasi dikirim ulang. Cek inbox & folder spam kamu.");
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -41,7 +74,7 @@ export default function AuthGate({ children }) {
     } else {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) setError(error.message);
-      else setInfo("Akun dibuat. Cek email untuk konfirmasi, lalu masuk di sini.");
+      else setInfo("🎉 Akun dibuat! Buka email kamu, klik link konfirmasi (cek juga folder spam), lalu masuk di sini.");
     }
     setSubmitting(false);
   }
@@ -66,6 +99,82 @@ export default function AuthGate({ children }) {
           style={{ width: 96, height: 96, borderRadius: 26, overflow: "hidden", background: "var(--bg-surface)", boxShadow: "0 12px 40px var(--shadow)" }}
         >
           <img src={logoUrl} alt="BQ Finance" className="bqfinance-logo-breathe" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (confirmStatus !== "idle") {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center px-5" style={{ background: "var(--bg-page)" }}>
+        <div className="w-full text-center" style={{ maxWidth: 360 }}>
+          <div className="flex items-center justify-center mb-4 mx-auto" style={{ width: 88, height: 88, borderRadius: 22, overflow: "hidden", background: "var(--bg-surface)" }}>
+            <img src={logoUrl} alt="BQ Finance" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          </div>
+
+          {confirmStatus === "processing" && (
+            <>
+              <div className="mx-auto mb-4" style={{ width: 40, height: 40, border: "3px solid var(--bg-selected)", borderTopColor: "var(--blue)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+              <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 700, fontSize: 17 }}>Memverifikasi email...</p>
+              <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 6 }}>Tunggu sebentar ya, konfirmasi sedang diproses.</p>
+            </>
+          )}
+
+          {confirmStatus === "success" && (
+            <>
+              <p style={{ fontSize: 44, lineHeight: 1 }}>🎉</p>
+              <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 19, marginTop: 8 }}>
+                Email berhasil dikonfirmasi!
+              </p>
+              <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 8 }}>
+                Akun kamu sudah aktif. Silakan masuk untuk mulai memakai BQ Finance.
+              </p>
+              <button
+                onClick={() => setConfirmStatus("idle")}
+                className="w-full py-3 rounded-xl mt-6"
+                style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700 }}
+              >
+                Lanjut
+              </button>
+            </>
+          )}
+
+          {confirmStatus === "error" && (
+            <>
+              <p style={{ fontSize: 44, lineHeight: 1 }}>😕</p>
+              <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 19, marginTop: 8 }}>
+                Link tidak valid
+              </p>
+              <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 8 }}>
+                Link konfirmasi ini sudah kedaluwarsa atau sudah pernah dipakai. Masukkan email kamu untuk kami kirimkan link baru.
+              </p>
+              <input
+                type="email"
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+                placeholder="Email kamu"
+                className="w-full px-3.5 py-3 rounded-xl outline-none mt-4 text-left"
+                style={{ background: "var(--bg-surface)", color: "var(--text-primary)", fontSize: 13, border: "1px solid var(--bg-selected)" }}
+              />
+              {error && <p style={{ color: "var(--negative)", fontSize: 11.5, marginTop: 8 }}>{error}</p>}
+              {info && <p style={{ color: "var(--positive)", fontSize: 11.5, marginTop: 8 }}>{info}</p>}
+              <button
+                onClick={handleResend}
+                disabled={resending || !confirmEmail}
+                className="w-full py-3 rounded-xl mt-4"
+                style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700, opacity: resending || !confirmEmail ? 0.7 : 1 }}
+              >
+                {resending ? "Mengirim..." : "Kirim ulang link"}
+              </button>
+              <button
+                onClick={() => setConfirmStatus("idle")}
+                className="w-full py-3 rounded-xl mt-2"
+                style={{ background: "var(--bg-surface)", color: "var(--text-primary)", fontSize: 13, fontWeight: 600, border: "1px solid var(--bg-selected)" }}
+              >
+                Kembali ke halaman masuk
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
