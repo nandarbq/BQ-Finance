@@ -32,6 +32,20 @@ create table if not exists transactions (
   created_at timestamptz not null default now()
 );
 
+-- =========================================================
+-- Tabel anggaran (limit pengeluaran per kategori per bulan)
+-- =========================================================
+create table if not exists budgets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  mode text not null check (mode in ('pribadi', 'keluarga')),
+  category text not null,
+  amount numeric not null check (amount > 0),
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists idx_budgets_user_mode_cat on budgets (user_id, mode, category);
+
 create index if not exists idx_transactions_user_mode on transactions (user_id, mode);
 create index if not exists idx_transactions_user_date on transactions (user_id, date desc);
 create index if not exists idx_members_user on members (user_id);
@@ -42,17 +56,37 @@ create index if not exists idx_members_user on members (user_id);
 -- =========================================================
 alter table members enable row level security;
 alter table transactions enable row level security;
+alter table budgets enable row level security;
 
+drop policy if exists "members_select_own" on members;
 create policy "members_select_own" on members
   for select using (auth.uid() = user_id);
+drop policy if exists "members_insert_own" on members;
 create policy "members_insert_own" on members
   for insert with check (auth.uid() = user_id);
+drop policy if exists "members_delete_own" on members;
 create policy "members_delete_own" on members
   for delete using (auth.uid() = user_id);
 
+drop policy if exists "transactions_select_own" on transactions;
 create policy "transactions_select_own" on transactions
   for select using (auth.uid() = user_id);
+drop policy if exists "transactions_insert_own" on transactions;
 create policy "transactions_insert_own" on transactions
   for insert with check (auth.uid() = user_id);
+drop policy if exists "transactions_delete_own" on transactions;
 create policy "transactions_delete_own" on transactions
+  for delete using (auth.uid() = user_id);
+
+drop policy if exists "budgets_select_own" on budgets;
+create policy "budgets_select_own" on budgets
+  for select using (auth.uid() = user_id);
+drop policy if exists "budgets_insert_own" on budgets;
+create policy "budgets_insert_own" on budgets
+  for insert with check (auth.uid() = user_id);
+drop policy if exists "budgets_update_own" on budgets;
+create policy "budgets_update_own" on budgets
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "budgets_delete_own" on budgets;
+create policy "budgets_delete_own" on budgets
   for delete using (auth.uid() = user_id);

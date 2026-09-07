@@ -86,3 +86,35 @@ export async function deleteMemberById(id) {
   const { error } = await supabase.from("members").delete().eq("id", id);
   if (error) throw error;
 }
+
+function rowToBudget(row) {
+  return { id: row.id, mode: row.mode, category: row.category, amount: Number(row.amount) };
+}
+
+export async function fetchBudgets(userId) {
+  const { data, error } = await supabase
+    .from("budgets")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data || []).map(rowToBudget);
+}
+
+export async function upsertBudget(userId, draft) {
+  const { data, error } = await supabase
+    .from("budgets")
+    .upsert(
+      { user_id: userId, mode: draft.mode, category: draft.category, amount: draft.amount },
+      { onConflict: "user_id,mode,category" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToBudget(data);
+}
+
+export async function deleteBudgetById(id) {
+  const { error } = await supabase.from("budgets").delete().eq("id", id);
+  if (error) throw error;
+}

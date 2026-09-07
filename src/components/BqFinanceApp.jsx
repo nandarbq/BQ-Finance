@@ -3,9 +3,9 @@ import {
   Plus, X, Home, PieChart as PieIcon, ListChecks, Settings, Users,
   UtensilsCrossed, Car, ShoppingBag, Receipt, Gamepad2, HeartPulse,
   GraduationCap, MoreHorizontal, Gift, Briefcase, TrendingUp,
-Sparkles, ChevronLeft, ChevronRight, Trash2, Calendar, PiggyBank,
-Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon, Camera,
-ZoomIn, ZoomOut, Pencil, FileDown, Download, WifiOff,
+  Sparkles, ChevronLeft, ChevronRight, Trash2, Calendar, PiggyBank,
+  Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon, Camera,
+  ZoomIn, ZoomOut, Pencil, FileDown, Download, WifiOff, Search, Target,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
@@ -15,6 +15,7 @@ import { supabase } from "../lib/supabaseClient";
 import {
   fetchTransactions, insertTransaction, deleteTransactionById, deleteTransactionsByMode,
   fetchMembers, insertMember, deleteMemberById,
+  fetchBudgets, upsertBudget, deleteBudgetById,
 } from "../lib/financeApi";
 import { exportTransactionPdf } from "../lib/exportPdf";
 import defaultRobotAvatar from "../assets/avatar robot bq finance.png";
@@ -93,6 +94,21 @@ function formatDateShort(iso) {
 function getCatMeta(type, catId) {
   const list = type === "out" ? EXPENSE_CATS : INCOME_CATS;
   return list.find((c) => c.id === catId) || { label: catId, icon: MoreHorizontal, color: "var(--text-muted)" };
+}
+function deltaPct(cur, prev) {
+  if (prev <= 0) return cur > 0 ? 100 : 0;
+  return Math.round(((cur - prev) / prev) * 100);
+}
+function monthTotals(list, key) {
+  const monthTx = list.filter((t) => t.date.startsWith(key));
+  const income = monthTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0);
+  const expense = monthTx.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0);
+  return { income, expense, balance: income - expense };
+}
+function budgetColor(pct) {
+  if (pct >= 100) return "var(--negative)";
+  if (pct >= 80) return "#f5b50a";
+  return "var(--blue)";
 }
 function useCountUp(value, duration = 650) {
   const [display, setDisplay] = useState(0);
@@ -318,7 +334,7 @@ function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvat
 
 /* --------------------------------- Beranda --------------------------------- */
 
-function TabBeranda({ mode, modeTx, members, setActiveTab, openQuickAdd }) {
+function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd }) {
   const curKey = monthKeyFor(0);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
   const totalIncome = useMemo(() => modeTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [modeTx]);
@@ -338,6 +354,13 @@ const catBreakdown = useMemo(() => {
   }, [monthTx]);
 
   const recent = useMemo(() => [...modeTx].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5), [modeTx]);
+
+  const budgetRows = useMemo(() => modeBudgets.map((b) => {
+    const spent = monthTx.filter((t) => t.type === "out" && t.category === b.category).reduce((s, t) => s + t.amount, 0);
+    const meta = getCatMeta("out", b.category);
+    const pct = b.amount > 0 ? (spent / b.amount) * 100 : 0;
+    return { ...b, meta, spent, pct };
+  }), [modeBudgets, monthTx]);
 
   return (
     <div className="px-4 pt-1 pb-4">
@@ -411,6 +434,49 @@ const catBreakdown = useMemo(() => {
         )}
       </div>
 
+      <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
+        <div className="flex items-center justify-between mb-2">
+          <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Anggaran bulan ini</p>
+          <button onClick={() => setActiveTab("pengaturan")} style={{ color: "var(--blue)", fontSize: 11.5, fontWeight: 600 }}>Atur</button>
+        </div>
+        {budgetRows.length === 0 ? (
+          <button onClick={() => setActiveTab("pengaturan")} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5" style={{ background: "var(--bg-muted)", color: "var(--text-muted)", fontSize: 11.5 }}>
+            <Target size={14} color="var(--blue)" />
+            <span>Belum ada anggaran. Ketuk untuk atur limit pengeluaran tiap kategori.</span>
+          </button>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {budgetRows.map((b) => {
+              const Icon = b.meta.icon;
+              const over = b.spent > b.amount;
+              const remaining = b.amount - b.spent;
+              return (
+                <div key={b.id} className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center" style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, " + b.meta.color + " 15%, transparent)", flexShrink: 0 }}>
+                    <Icon size={15} color={b.meta.color} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{b.meta.label}</p>
+                      <p style={{ color: over ? "var(--negative)" : "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }}>
+                        {over ? "Lebih " + formatRupiah(-remaining) : "Sisa " + formatRupiah(remaining)}
+                      </p>
+                    </div>
+                    <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-muted)" }}>
+                      <div style={{ width: Math.min(b.pct, 100) + "%", height: "100%", borderRadius: 99, background: budgetColor(b.pct), transition: "width 0.4s ease" }} />
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span style={{ color: "var(--text-faint)", fontSize: 10 }}>{formatRupiah(b.spent)} dipakai</span>
+                      <span style={{ color: "var(--text-faint)", fontSize: 10 }}>dari {formatRupiah(b.amount)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="rounded-2xl p-4" style={{ background: "var(--bg-surface)" }}>
         <div className="flex items-center justify-between mb-1">
           <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Transaksi terbaru</p>
@@ -457,6 +523,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete }) {
   const [startDate, setStartDate] = useState(monthRange(0).start);
   const [endDate, setEndDate] = useState(todayISO());
   const [confirmId, setConfirmId] = useState(null);
+  const [query, setQuery] = useState("");
 
   const periodRange = useMemo(() => {
     if (period === "month") return monthRange(0);
@@ -466,11 +533,22 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete }) {
   }, [period, startDate, endDate]);
 
   const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
     let list = [...modeTx];
     if (filter !== "all") list = list.filter((t) => t.type === filter);
     if (periodRange?.start) list = list.filter((t) => t.date >= periodRange.start && t.date <= periodRange.end);
+    if (q) {
+      list = list.filter((t) => {
+        const member = members.find((m) => m.id === t.memberId);
+        const note = (t.note || "").toLowerCase();
+        const catLabel = getCatMeta(t.type, t.category).label.toLowerCase();
+        const amount = String(Math.round(t.amount)).toLowerCase();
+        const memberName = member ? member.name.toLowerCase() : "";
+        return note.includes(q) || catLabel.includes(q) || amount.includes(q) || memberName.includes(q);
+      });
+    }
     return list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.createdAt - a.createdAt));
-  }, [modeTx, filter, periodRange]);
+  }, [modeTx, filter, periodRange, query, members]);
 
   const summary = useMemo(() => filtered.reduce((total, t) => {
     total[t.type === "in" ? "income" : "expense"] += t.amount;
@@ -506,6 +584,22 @@ const grouped = useMemo(() => {
 
   return (
     <div className="px-4 pt-1 pb-4">
+      <div className="relative mb-3">
+        <Search size={14} color="var(--text-faint)" style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)" }} />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Cari catatan, kategori, nominal, atau anggota..."
+          aria-label="Cari transaksi"
+          className="w-full outline-none"
+          style={{ background: "var(--bg-surface)", border: "1px solid var(--border)", borderColor: query ? "var(--blue)" : "var(--border)", color: "var(--text-primary)", fontSize: 12.5, padding: "10px 12px 10px 34px", borderRadius: 12 }}
+        />
+        {query && (
+          <button onClick={() => setQuery("")} aria-label="Bersihkan pencarian" className="p-1 rounded-full" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "var(--bg-muted)", color: "var(--text-faint)" }}>
+            <X size={13} />
+          </button>
+        )}
+      </div>
       <div className="flex items-center gap-2 mb-4">
         {[{ id: "all", label: "Semua" }, { id: "in", label: "Pemasukan" }, { id: "out", label: "Pengeluaran" }].map((f) => (
           <button key={f.id} onClick={() => setFilter(f.id)} className="px-3 py-1.5 rounded-full transition-colors"
@@ -532,7 +626,7 @@ const grouped = useMemo(() => {
       </div>
 
       {grouped.length === 0 ? (
-        <EmptyState icon={ListChecks} title="Tidak ada transaksi" subtitle="Coba ubah filter atau catat transaksi baru." />
+        <EmptyState icon={Search} title={query ? "Tidak ditemukan" : "Tidak ada transaksi"} subtitle={query ? "Coba kata kunci lain atau periksa filternya." : "Coba ubah filter atau catat transaksi baru."} />
       ) : (
         grouped.map(([date, txs]) => (
           <div key={date} className="mb-4">
@@ -583,6 +677,33 @@ function TabGrafik({ modeTx }) {
   const curKey = monthKeyFor(offset);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
 
+  const curTotals = useMemo(() => monthTotals(modeTx, curKey), [modeTx, curKey]);
+  const prevTotals = useMemo(() => monthTotals(modeTx, monthKeyFor(offset - 1)), [modeTx, offset]);
+  const compare = useMemo(() => !(curTotals.income === 0 && curTotals.expense === 0), [curTotals]);
+
+  function renderCompareRow({ label, cur, prev, goodWhenDown, accent }) {
+    const delta = deltaPct(cur, prev);
+    const up = delta > 0;
+    const flat = delta === 0;
+    const good = flat ? true : up ? !goodWhenDown : goodWhenDown;
+    const Icon = up ? ArrowUpRight : ArrowDownRight;
+    return (
+      <div className="flex items-center gap-3 py-2" style={{ borderTop: "1px solid var(--border)" }}>
+        <div className="flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, background: "color-mix(in srgb, " + accent + " 15%, transparent)", flexShrink: 0 }}>
+          <Icon size={14} color={accent} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 600 }}>{formatRupiah(cur)}</p>
+          <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>{label} · bulan lalu {formatRupiah(prev)}</p>
+        </div>
+        <div className="flex items-center gap-1 px-2 py-1 rounded-full flex-shrink-0" style={{ background: flat ? "var(--bg-muted)" : "rgba(" + (good ? "0,171,107" : "238,74,73") + ",0.14)" }}>
+          <Icon size={10} color={flat ? "var(--text-faint)" : good ? "var(--positive)" : "var(--negative)"} />
+          <span style={{ color: flat ? "var(--text-faint)" : good ? "var(--positive)" : "var(--negative)", fontSize: 10, fontWeight: 700 }}>{flat ? "0%" : Math.abs(delta) + "%"}</span>
+        </div>
+      </div>
+    );
+  }
+
 const catBreakdown = useMemo(() => {
     const map = { in: 0, out: 0 };
     monthTx.forEach((t) => { map[t.type] += t.amount; });
@@ -612,6 +733,22 @@ const catBreakdown = useMemo(() => {
         <button onClick={() => setOffset((o) => o - 1)} className="p-1.5 rounded-lg" style={{ background: "var(--bg-muted)" }}><ChevronLeft size={15} color="var(--text-secondary)" /></button>
         <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 600, textTransform: "capitalize" }}>{monthLabel(offset)}</p>
         <button onClick={() => setOffset((o) => Math.min(o + 1, 0))} className="p-1.5 rounded-lg" style={{ background: "var(--bg-muted)", opacity: offset === 0 ? 0.4 : 1 }} disabled={offset === 0}><ChevronRight size={15} color="var(--text-secondary)" /></button>
+      </div>
+
+      <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
+        <div className="flex items-center justify-between mb-1">
+          <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Perbandingan bulan</p>
+          <span style={{ color: "var(--text-muted)", fontSize: 10.5 }}>{monthLabel(offset)} vs {monthLabel(offset - 1)}</span>
+        </div>
+        {compare ? (
+          <div className="flex flex-col mt-1">
+            {renderCompareRow({ label: "Pemasukan", cur: curTotals.income, prev: prevTotals.income, goodWhenDown: false, accent: "var(--positive)" })}
+            {renderCompareRow({ label: "Pengeluaran", cur: curTotals.expense, prev: prevTotals.expense, goodWhenDown: true, accent: "var(--negative)" })}
+            {renderCompareRow({ label: "Selisih", cur: curTotals.balance, prev: prevTotals.balance, goodWhenDown: true, accent: "var(--blue)" })}
+          </div>
+        ) : (
+          <EmptyState icon={TrendingUp} title="Tidak ada data untuk dibandingkan" subtitle="Catat transaksi bulan ini untuk melihat perbandingannya dengan bulan lalu." />
+        )}
       </div>
 
       <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
@@ -673,13 +810,16 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Pengaturan -------------------------------- */
 
-function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData, modeTx, userEmail, onSignOut, theme, onToggleTheme, displayName, onNameChange }) {
+function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember, onSaveBudget, onDeleteBudget, onClearData, modeTx, userEmail, onSignOut, theme, onToggleTheme, displayName, onNameChange }) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(MEMBER_COLORS[0]);
   const [confirmClear, setConfirmClear] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(displayName);
+  const [showAddBudget, setShowAddBudget] = useState(false);
+  const [budgetCat, setBudgetCat] = useState(null);
+  const [budgetAmount, setBudgetAmount] = useState("");
 
   const memberTotals = useMemo(() => members.map((m) => {
     const spent = modeTx.filter((t) => t.memberId === m.id && t.type === "out").reduce((s, t) => s + t.amount, 0);
@@ -726,6 +866,78 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
         </p>
       </div>
 
+      <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5"><Target size={14} color="var(--blue)" /><p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Anggaran</p></div>
+          <button onClick={() => setShowAddBudget((v) => !v)} className="flex items-center gap-1 px-2.5 py-1 rounded-full" style={{ background: "var(--bg-muted)" }}>
+            <UserPlus size={12} color="var(--blue)" />
+            <span style={{ color: "var(--blue)", fontSize: 10.5, fontWeight: 600 }}>Tambah</span>
+          </button>
+        </div>
+        <p style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 10 }}>Limit pengeluaran bulanan per kategori di mode {mode === "keluarga" ? "keluarga" : "pribadi"}. Terkait di kartu Beranda.</p>
+        {showAddBudget && (
+          <div className="rounded-xl p-3 mb-3" style={{ background: "var(--bg-muted)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <p style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>Tambah Anggaran</p>
+              <button onClick={() => { setShowAddBudget(false); setBudgetCat(null); setBudgetAmount(""); }} className="p-1 rounded-full" style={{ background: "var(--bg-app)" }}>
+                <X size={13} color="var(--text-muted)" />
+              </button>
+            </div>
+            <p style={{ color: "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }} className="mb-1.5">Pilih kategori</p>
+            <div className="grid grid-cols-4 gap-1.5 mb-2.5">
+              {EXPENSE_CATS.map((c) => {
+                const Icon = c.icon;
+                const active = budgetCat === c.id;
+                return (
+                  <button key={c.id} onClick={() => setBudgetCat(c.id)} className="flex flex-col items-center gap-1 py-2 rounded-lg"
+                    style={{ background: active ? "color-mix(in srgb, " + c.color + " 15%, transparent)" : "var(--bg-app)", boxShadow: active ? "0 0 0 1.5px " + c.color + " inset" : "none" }}>
+                    <Icon size={14} color={active ? c.color : "var(--text-muted)"} />
+                    <span style={{ color: active ? "var(--text-primary)" : "var(--text-muted)", fontSize: 8.5, fontWeight: 600 }}>{c.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1.5 mb-2.5 px-3 py-2 rounded-lg" style={{ background: "var(--bg-app)", border: "1px solid var(--bg-selected)" }}>
+              <span style={{ color: "var(--text-muted)", fontSize: 12.5, fontWeight: 600 }}>Rp</span>
+              <input inputMode="numeric" value={budgetAmount ? Number(budgetAmount).toLocaleString("id-ID") : ""} onChange={(e) => setBudgetAmount(e.target.value.replace(/[^0-9]/g, ""))} placeholder="0"
+                className="w-full outline-none bg-transparent" style={{ color: "var(--text-primary)", fontSize: 12.5, border: "none" }} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => { setShowAddBudget(false); setBudgetCat(null); setBudgetAmount(""); }}
+                className="flex-1 py-2 rounded-lg" style={{ background: "var(--bg-app)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>
+                Batal
+              </button>
+              <button onClick={() => { if (budgetCat && parseInt(budgetAmount, 10) > 0) { onSaveBudget(budgetCat, parseInt(budgetAmount, 10)); setBudgetCat(null); setBudgetAmount(""); setShowAddBudget(false); } }}
+                className="flex-1 py-2 rounded-lg" style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 12, fontWeight: 700 }}>
+                Simpan
+              </button>
+            </div>
+          </div>
+        )}
+        {modeBudgets.length === 0 ? (
+          !showAddBudget && <p style={{ color: "var(--text-faint)", fontSize: 11 }}>Belum ada anggaran untuk mode ini.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {modeBudgets.map((b) => {
+              const meta = getCatMeta("out", b.category);
+              const Icon = meta.icon;
+              return (
+                <div key={b.id} className="flex items-center gap-2.5">
+                  <div className="flex items-center justify-center" style={{ width: 30, height: 30, borderRadius: 9, background: "color-mix(in srgb, " + meta.color + " 15%, transparent)" }}>
+                    <Icon size={14} color={meta.color} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }} className="truncate">{meta.label}</p>
+                    <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>{formatRupiah(b.amount)} / bulan</p>
+                  </div>
+                  <button onClick={() => onDeleteBudget(b.id)} className="p-1.5"><Trash2 size={13} color="var(--text-faint)" /></button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="rounded-2xl p-4 mb-4 flex items-center justify-between" style={{ background: "var(--bg-surface)" }}>
         <div className="flex-1 min-w-0 mr-3">
           <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Tampilan</p>
@@ -747,6 +959,12 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
           </div>
           {showAddMember && (
             <div className="rounded-xl p-3 mb-3" style={{ background: "var(--bg-muted)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <p style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>Tambah Anggota</p>
+                <button onClick={() => { setShowAddMember(false); setName(""); setColor(MEMBER_COLORS[0]); }} className="p-1 rounded-full" style={{ background: "var(--bg-app)" }}>
+                  <X size={13} color="var(--text-muted)" />
+                </button>
+              </div>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama anggota"
                 className="w-full mb-2 px-3 py-2 rounded-lg outline-none" style={{ background: "var(--bg-app)", color: "var(--text-primary)", fontSize: 12.5, border: "1px solid var(--bg-selected)" }} />
               <div className="flex items-center gap-2 mb-2.5">
@@ -754,9 +972,15 @@ function TabPengaturan({ mode, members, onAddMember, onDeleteMember, onClearData
                   <button key={c} onClick={() => setColor(c)} style={{ width: 22, height: 22, borderRadius: 99, background: c, boxShadow: color === c ? "0 0 0 2px var(--bg-muted), 0 0 0 4px " + c : "none" }} />
                 ))}
               </div>
-              <button onClick={() => { onAddMember(name, color); setName(""); setShowAddMember(false); }} className="w-full py-2 rounded-lg" style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 12, fontWeight: 700 }}>
-                Simpan anggota
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => { setShowAddMember(false); setName(""); setColor(MEMBER_COLORS[0]); }}
+                  className="flex-1 py-2 rounded-lg" style={{ background: "var(--bg-app)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>
+                  Batal
+                </button>
+                <button onClick={() => { onAddMember(name, color); setName(""); setShowAddMember(false); }} className="flex-1 py-2 rounded-lg" style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 12, fontWeight: 700 }}>
+                  Simpan
+                </button>
+              </div>
             </div>
           )}
           <div className="flex flex-col gap-2">
@@ -907,6 +1131,7 @@ export default function BqFinanceApp({ session }) {
   const [mode, setMode] = useState(() => localStorage.getItem("bqfinance_mode") || "pribadi");
   const [transactions, setTransactions] = useState([]);
   const [members, setMembers] = useState([]);
+  const [budgets, setBudgets] = useState([]);
   const [activeTab, setActiveTab] = useState("beranda");
 const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -929,10 +1154,11 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
     let mounted = true;
     (async () => {
       try {
-        const [tx, mem] = await Promise.all([fetchTransactions(userId), fetchMembers(userId)]);
+        const [tx, mem, bdgt] = await Promise.all([fetchTransactions(userId), fetchMembers(userId), fetchBudgets(userId)]);
         if (!mounted) return;
         setTransactions(tx);
         setMembers(mem);
+        setBudgets(bdgt);
       } catch (e) {
         console.error(e);
         setLoadError("Gagal memuat data. Periksa koneksi atau konfigurasi Supabase.");
@@ -967,6 +1193,7 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
     };
   }, []);
 const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [transactions, mode]);
+  const modeBudgets = useMemo(() => budgets.filter((b) => b.mode === mode), [budgets, mode]);
 
   const handleSaveTransaction = useCallback(async (draft) => {
     setSaving(true);
@@ -1028,6 +1255,32 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       alert("Gagal menghapus anggota.");
     }
   }, [members]);
+
+  const handleSaveBudget = useCallback(async (category, amount) => {
+    if (!category || !amount || amount <= 0) return;
+    try {
+      const b = await upsertBudget(userId, { mode, category, amount });
+      setBudgets((prev) => {
+        const rest = prev.filter((x) => !(x.mode === mode && x.category === category));
+        return [...rest, b];
+      });
+    } catch (e) {
+      console.error(e);
+      alert("Gagal menyimpan anggaran.");
+    }
+  }, [userId, mode]);
+
+  const handleDeleteBudget = useCallback(async (id) => {
+    const prev = budgets;
+    setBudgets((p) => p.filter((b) => b.id !== id));
+    try {
+      await deleteBudgetById(id);
+    } catch (e) {
+      console.error(e);
+      setBudgets(prev);
+      alert("Gagal menghapus anggaran.");
+    }
+  }, [budgets]);
 
   function handleModeChange(m) {
     setMode(m);
@@ -1139,11 +1392,11 @@ return (
             <div className="flex items-center justify-center h-full px-6 text-center"><span style={{ color: "var(--negative)", fontSize: 12 }}>{loadError}</span></div>
           ) : (
             <div key={activeTab} className="bqfinance-tabfade">
-              {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} members={members} setActiveTab={setActiveTab} openQuickAdd={() => setQuickAddOpen(true)} />}
+              {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} modeBudgets={modeBudgets} members={members} setActiveTab={setActiveTab} openQuickAdd={() => setQuickAddOpen(true)} />}
               {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
-                <TabPengaturan mode={mode} members={members} modeTx={modeTx} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} />
+                <TabPengaturan mode={mode} members={members} modeTx={modeTx} modeBudgets={modeBudgets} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} />
               )}
             </div>
           )}
