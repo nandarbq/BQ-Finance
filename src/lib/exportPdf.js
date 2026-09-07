@@ -47,7 +47,11 @@ const INK = [30, 41, 59];
 const MUTED = [100, 116, 139];
 const LINE = [226, 232, 240];
 
+let categoriesRef = [];
+
 function categoryLabel(type, catId) {
+  const found = categoriesRef.find((c) => c.type === type && c.label.toLowerCase() === String(catId).toLowerCase());
+  if (found) return found.label;
   const list = CAT_LABELS[type] || {};
   return list[catId] || catId || "Lainnya";
 }
@@ -61,7 +65,8 @@ function formatAmount(type, n) {
   return (type === "in" ? "+" : "-") + rupiah(n);
 }
 
-export async function exportTransactionPdf({ transactions, members, mode = "pribadi", periodLabel = "", displayName = "" }) {
+export async function exportTransactionPdf({ transactions, members, mode = "pribadi", periodLabel = "", displayName = "", categories = [] }) {
+  categoriesRef = categories || [];
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();

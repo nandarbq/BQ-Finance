@@ -118,3 +118,96 @@ export async function deleteBudgetById(id) {
   const { error } = await supabase.from("budgets").delete().eq("id", id);
   if (error) throw error;
 }
+
+/* ================================ Categories ================================ */
+
+const DEFAULT_CATEGORIES = [
+  { type: "out", label: "Makanan", icon: "UtensilsCrossed", color: "var(--negative)" },
+  { type: "out", label: "Transport", icon: "Car", color: "var(--cat-teal)" },
+  { type: "out", label: "Belanja", icon: "ShoppingBag", color: "var(--blue)" },
+  { type: "out", label: "Tagihan", icon: "Receipt", color: "var(--cat-olive)" },
+  { type: "out", label: "Hiburan", icon: "Gamepad2", color: "var(--cat-lime)" },
+  { type: "out", label: "Kesehatan", icon: "HeartPulse", color: "var(--cat-soft-red)" },
+  { type: "out", label: "Pendidikan", icon: "GraduationCap", color: "var(--cat-dark)" },
+  { type: "out", label: "Lainnya", icon: "MoreHorizontal", color: "var(--text-muted)" },
+  { type: "in", label: "Gaji", icon: "Briefcase", color: "var(--cat-green)" },
+  { type: "in", label: "Bonus", icon: "Sparkles", color: "var(--cat-teal)" },
+  { type: "in", label: "Usaha", icon: "TrendingUp", color: "var(--cat-lime)" },
+  { type: "in", label: "Hadiah", icon: "Gift", color: "var(--cat-mint)" },
+  { type: "in", label: "Investasi", icon: "PiggyBank", color: "var(--cat-dark)" },
+  { type: "in", label: "Lainnya", icon: "MoreHorizontal", color: "var(--text-muted)" },
+];
+
+function rowToCategory(row) {
+  return {
+    id: row.id,
+    type: row.type,
+    label: row.label,
+    icon: row.icon,
+    color: row.color,
+    isDefault: row.is_default,
+  };
+}
+
+export async function fetchCategories(userId) {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const rows = data || [];
+  if (rows.length === 0) {
+    await supabase
+      .from("categories")
+      .upsert(
+        DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId, is_default: true })),
+        { onConflict: "user_id,type,label", ignoreDuplicates: true }
+      );
+    const { data: seeded, error: seedError } = await supabase
+      .from("categories")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+    if (seedError) throw seedError;
+    return (seeded || []).map(rowToCategory);
+  }
+  return rows.map(rowToCategory);
+}
+
+export async function insertCategory(userId, draft) {
+  const { data, error } = await supabase
+    .from("categories")
+    .insert({
+      user_id: userId,
+      type: draft.type,
+      label: draft.label,
+      icon: draft.icon || "MoreHorizontal",
+      color: draft.color || "var(--text-muted)",
+      is_default: false,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToCategory(data);
+}
+
+export async function updateCategory(id, fields) {
+  const { data, error } = await supabase
+    .from("categories")
+    .update({ label: fields.label, icon: fields.icon, color: fields.color })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToCategory(data);
+}
+
+export async function deleteCategory(id) {
+  const { error } = await supabase
+    .from("categories")
+    .delete()
+    .eq("id", id)
+    .eq("is_default", false);
+  if (error) throw error;
+}

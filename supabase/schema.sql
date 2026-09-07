@@ -33,6 +33,32 @@ create table if not exists transactions (
 );
 
 -- =========================================================
+-- Tabel kategori (pemasukan & pengeluaran, per user)
+-- =========================================================
+create table if not exists categories (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  type text not null check (type in ('in', 'out')),
+  label text not null,
+  icon text not null default 'MoreHorizontal',
+  color text not null default 'var(--text-muted)',
+  is_default boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Bersihkan kategori duplikat (jika pernah ter-seed ganda): simpan baris paling awal saja
+delete from categories a
+  using categories b
+  where a.id <> b.id
+    and a.user_id = b.user_id
+    and a.type = b.type
+    and a.label = b.label;
+
+-- Unique agar seed default tidak pernah dobel (dipakai juga oleh onConflict DO NOTHING)
+drop index if exists idx_categories_user;
+create unique index if not exists idx_categories_user_type_label on categories (user_id, type, label);
+
+-- =========================================================
 -- Tabel anggaran (limit pengeluaran per kategori per bulan)
 -- =========================================================
 create table if not exists budgets (
@@ -57,6 +83,7 @@ create index if not exists idx_members_user on members (user_id);
 alter table members enable row level security;
 alter table transactions enable row level security;
 alter table budgets enable row level security;
+alter table categories enable row level security;
 
 drop policy if exists "members_select_own" on members;
 create policy "members_select_own" on members
@@ -89,4 +116,17 @@ create policy "budgets_update_own" on budgets
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists "budgets_delete_own" on budgets;
 create policy "budgets_delete_own" on budgets
+  for delete using (auth.uid() = user_id);
+
+drop policy if exists "categories_select_own" on categories;
+create policy "categories_select_own" on categories
+  for select using (auth.uid() = user_id);
+drop policy if exists "categories_insert_own" on categories;
+create policy "categories_insert_own" on categories
+  for insert with check (auth.uid() = user_id);
+drop policy if exists "categories_update_own" on categories;
+create policy "categories_update_own" on categories
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "categories_delete_own" on categories;
+create policy "categories_delete_own" on categories
   for delete using (auth.uid() = user_id);

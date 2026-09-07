@@ -6,6 +6,8 @@ import {
   Sparkles, ChevronLeft, ChevronRight, Trash2, Calendar, PiggyBank,
   Wallet, ArrowUpRight, ArrowDownRight, Check, UserPlus, LogOut, Sun, Moon, Camera,
   ZoomIn, ZoomOut, Pencil, FileDown, Download, WifiOff, Search, Target,
+  Trophy, BookOpen, Plane, Music, Dumbbell, PawPrint, Baby, Coffee,
+  Wifi, Zap, ShieldCheck, Landmark, Phone, Shirt, Stethoscope,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip,
@@ -16,30 +18,32 @@ import {
   fetchTransactions, insertTransaction, deleteTransactionById, deleteTransactionsByMode,
   fetchMembers, insertMember, deleteMemberById,
   fetchBudgets, upsertBudget, deleteBudgetById,
+  fetchCategories, insertCategory, updateCategory, deleteCategory,
 } from "../lib/financeApi";
 import { exportTransactionPdf } from "../lib/exportPdf";
 import defaultRobotAvatar from "../assets/avatar robot bq finance.png";
 
 /* ----------------------------- Konstanta & util ---------------------------- */
 
-const EXPENSE_CATS = [
-  { id: "makanan", label: "Makanan", icon: UtensilsCrossed, color: "var(--negative)" },
-  { id: "transport", label: "Transport", icon: Car, color: "var(--cat-teal)" },
-  { id: "belanja", label: "Belanja", icon: ShoppingBag, color: "var(--blue)" },
-  { id: "tagihan", label: "Tagihan", icon: Receipt, color: "var(--cat-olive)" },
-  { id: "hiburan", label: "Hiburan", icon: Gamepad2, color: "var(--cat-lime)" },
-  { id: "kesehatan", label: "Kesehatan", icon: HeartPulse, color: "var(--cat-soft-red)" },
-  { id: "pendidikan", label: "Pendidikan", icon: GraduationCap, color: "var(--cat-dark)" },
-  { id: "lainnya_out", label: "Lainnya", icon: MoreHorizontal, color: "var(--text-muted)" },
-];
+const ICON_MAP = {
+  UtensilsCrossed, Car, ShoppingBag, Receipt, Gamepad2, HeartPulse,
+  GraduationCap, MoreHorizontal, Gift, Briefcase, TrendingUp,
+  Sparkles, PiggyBank, Trophy, BookOpen, Plane, Music, Dumbbell,
+  PawPrint, Baby, Coffee, Wifi, Zap, ShieldCheck, Landmark, Phone,
+  Shirt, Stethoscope, Camera,
+};
 
-const INCOME_CATS = [
-  { id: "gaji", label: "Gaji", icon: Briefcase, color: "var(--cat-green)" },
-  { id: "bonus", label: "Bonus", icon: Sparkles, color: "var(--cat-teal)" },
-  { id: "usaha", label: "Usaha", icon: TrendingUp, color: "var(--cat-lime)" },
-  { id: "hadiah", label: "Hadiah", icon: Gift, color: "var(--cat-mint)" },
-  { id: "investasi", label: "Investasi", icon: PiggyBank, color: "var(--cat-dark)" },
-  { id: "lainnya_in", label: "Lainnya", icon: MoreHorizontal, color: "var(--text-muted)" },
+const CATEGORY_COLORS = [
+  { label: "Merah", value: "var(--negative)" },
+  { label: "Biru", value: "var(--blue)" },
+  { label: "Hijau", value: "var(--cat-green)" },
+  { label: "Teal", value: "var(--cat-teal)" },
+  { label: "Lime", value: "var(--cat-lime)" },
+  { label: "Olive", value: "var(--cat-olive)" },
+  { label: "Mint", value: "var(--cat-mint)" },
+  { label: "Soft Red", value: "var(--cat-soft-red)" },
+  { label: "Dark", value: "var(--cat-dark)" },
+  { label: "Abu", value: "var(--text-muted)" },
 ];
 
 const MEMBER_COLORS = ["var(--blue)", "var(--cat-teal)", "var(--negative)", "var(--cat-lime)", "var(--cat-dark)", "var(--positive)"];
@@ -91,9 +95,15 @@ function formatDateShort(iso) {
   if (iso === yest) return "Kemarin";
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
+let categoriesRef = [];
+function setCategoriesRef(list) {
+  categoriesRef = list || [];
+}
 function getCatMeta(type, catId) {
-  const list = type === "out" ? EXPENSE_CATS : INCOME_CATS;
-  return list.find((c) => c.id === catId) || { label: catId, icon: MoreHorizontal, color: "var(--text-muted)" };
+  const list = categoriesRef.filter((c) => c.type === type);
+  const found = list.find((c) => c.label.toLowerCase() === String(catId).toLowerCase());
+  if (found) return { ...found, icon: ICON_MAP[found.icon] || MoreHorizontal };
+  return { label: catId, icon: MoreHorizontal, color: "var(--text-muted)", isDefault: false };
 }
 function deltaPct(cur, prev) {
   if (prev <= 0) return cur > 0 ? 100 : 0;
@@ -517,7 +527,7 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Transaksi -------------------------------- */
 
-function TabTransaksi({ modeTx, members, mode, displayName, onDelete }) {
+function TabTransaksi({ modeTx, members, mode, displayName, onDelete, categories }) {
   const [filter, setFilter] = useState("all");
   const [period, setPeriod] = useState("month");
   const [startDate, setStartDate] = useState(monthRange(0).start);
@@ -579,6 +589,7 @@ const grouped = useMemo(() => {
       mode,
       periodLabel: periodLabel(),
       displayName,
+      categories,
     });
   }
 
@@ -810,7 +821,7 @@ const catBreakdown = useMemo(() => {
 
 /* -------------------------------- Pengaturan -------------------------------- */
 
-function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember, onSaveBudget, onDeleteBudget, onClearData, modeTx, userEmail, onSignOut, theme, onToggleTheme, displayName, onNameChange }) {
+function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember, onSaveBudget, onDeleteBudget, onClearData, modeTx, userEmail, onSignOut, theme, onToggleTheme, displayName, onNameChange, categories }) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(MEMBER_COLORS[0]);
@@ -885,11 +896,11 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
             </div>
             <p style={{ color: "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }} className="mb-1.5">Pilih kategori</p>
             <div className="grid grid-cols-4 gap-1.5 mb-2.5">
-              {EXPENSE_CATS.map((c) => {
-                const Icon = c.icon;
-                const active = budgetCat === c.id;
+              {categories.filter((c) => c.type === "out").map((c) => {
+                const Icon = ICON_MAP[c.icon] || MoreHorizontal;
+                const active = budgetCat === c.label;
                 return (
-                  <button key={c.id} onClick={() => setBudgetCat(c.id)} className="flex flex-col items-center gap-1 py-2 rounded-lg"
+                  <button key={c.id} onClick={() => setBudgetCat(c.label)} className="flex flex-col items-center gap-1 py-2 rounded-lg"
                     style={{ background: active ? "color-mix(in srgb, " + c.color + " 15%, transparent)" : "var(--bg-app)", boxShadow: active ? "0 0 0 1.5px " + c.color + " inset" : "none" }}>
                     <Icon size={14} color={active ? c.color : "var(--text-muted)"} />
                     <span style={{ color: active ? "var(--text-primary)" : "var(--text-muted)", fontSize: 8.5, fontWeight: 600 }}>{c.label}</span>
@@ -1018,7 +1029,7 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
 
 /* ------------------------------ Quick Add Sheet ----------------------------- */
 
-function QuickAddSheet({ mode, members, onClose, onSave, saving }) {
+function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onAddCategory, onUpdateCategory, onDeleteCategory }) {
   const [type, setType] = useState("out");
   const [amountStr, setAmountStr] = useState("");
   const [category, setCategory] = useState(null);
@@ -1026,11 +1037,14 @@ function QuickAddSheet({ mode, members, onClose, onSave, saving }) {
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
   const [date, setDate] = useState(todayISO());
+  const [managing, setManaging] = useState(false);
+  const [form, setForm] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const dateInputRef = useRef(null);
   const amount = parseInt(amountStr || "0", 10);
-  const cats = type === "out" ? EXPENSE_CATS : INCOME_CATS;
+  const cats = categories.filter((c) => c.type === type);
 
-  useEffect(() => { setCategory(null); }, [type]);
+  useEffect(() => { setCategory(null); setManaging(false); setForm(null); setConfirmDeleteId(null); }, [type]);
   const canSave = amount > 0 && category && !saving;
 
   function addChip(v) { setAmountStr((prev) => String((parseInt(prev || "0", 10) || 0) + v)); }
@@ -1039,6 +1053,30 @@ function QuickAddSheet({ mode, members, onClose, onSave, saving }) {
   function handleSave() {
     if (!canSave) return;
     onSave({ mode, type, amount, category, note: note.trim(), date, memberId: mode === "keluarga" ? memberId : null });
+  }
+
+  function openAddForm() {
+    setForm({ id: null, label: "", icon: "MoreHorizontal", color: CATEGORY_COLORS[3].value });
+  }
+  function openEditForm(c) {
+    setForm({ id: c.id, label: c.label, icon: c.icon, color: c.color });
+  }
+  function handleFormSave() {
+    if (!form || !form.label || !form.label.trim()) return;
+    const label = form.label.trim();
+    if (form.id === null) {
+      onAddCategory({ type, label, icon: form.icon, color: form.color });
+      setCategory(label);
+    } else {
+      onUpdateCategory(form.id, { label, icon: form.icon, color: form.color });
+      if (category && category.toLowerCase() === label.toLowerCase()) setCategory(label);
+    }
+    setForm(null);
+  }
+  function handleFormDelete() {
+    if (!form || form.id === null) return;
+    onDeleteCategory(form.id);
+    setForm(null);
   }
 
   return (
@@ -1069,20 +1107,122 @@ function QuickAddSheet({ mode, members, onClose, onSave, saving }) {
           </div>
         </div>
 
-        <p style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 600 }} className="mb-2">Kategori</p>
-        <div className="grid grid-cols-4 gap-2 mb-4">
-          {cats.map((c) => {
-            const Icon = c.icon;
-            const active = category === c.id;
-            return (
-              <button key={c.id} onClick={() => setCategory(c.id)} className="flex flex-col items-center gap-1 py-2.5 rounded-xl transition-transform"
-                style={{ background: active ? "color-mix(in srgb, " + c.color + " 15%, transparent)" : "var(--bg-muted)", boxShadow: active ? "0 0 0 1.5px " + c.color + " inset" : "none" }}>
-                <Icon size={16} color={active ? c.color : "var(--text-muted)"} />
-                <span style={{ color: active ? "var(--text-primary)" : "var(--text-muted)", fontSize: 9.5, fontWeight: 600 }}>{c.label}</span>
+        {!managing ? (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <p style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 600 }}>Kategori</p>
+              <button onClick={() => setManaging(true)} className="flex items-center gap-1 px-2 py-1 rounded-full" style={{ background: "var(--bg-muted)" }}>
+                <Pencil size={11} color="var(--blue)" />
+                <span style={{ color: "var(--blue)", fontSize: 10, fontWeight: 600 }}>Kelola</span>
               </button>
-            );
-          })}
-        </div>
+            </div>
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {cats.map((c) => {
+                const Icon = ICON_MAP[c.icon] || MoreHorizontal;
+                const active = category === c.label;
+                return (
+                  <button key={c.id} onClick={() => setCategory(c.label)} className="flex flex-col items-center gap-1 py-2.5 rounded-xl transition-transform"
+                    style={{ background: active ? "color-mix(in srgb, " + c.color + " 15%, transparent)" : "var(--bg-muted)", boxShadow: active ? "0 0 0 1.5px " + c.color + " inset" : "none" }}>
+                    <Icon size={16} color={active ? c.color : "var(--text-muted)"} />
+                    <span style={{ color: active ? "var(--text-primary)" : "var(--text-muted)", fontSize: 9.5, fontWeight: 600 }}>{c.label}</span>
+                  </button>
+                );
+              })}
+              {cats.length < 24 && (
+                <button onClick={() => { setManaging(true); openAddForm(); }} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl"
+                  style={{ background: "var(--bg-muted)", color: "var(--text-faint)", border: "1px dashed var(--text-faint)" }}>
+                  <Plus size={16} />
+                  <span style={{ fontSize: 9.5, fontWeight: 600 }}>Tambah</span>
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="rounded-xl p-3 mb-4" style={{ background: "var(--bg-muted)" }}>
+            <div className="flex items-center justify-between mb-2">
+              <p style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>Kelola {type === "out" ? "Pengeluaran" : "Pemasukan"}</p>
+              <button onClick={() => { setManaging(false); setForm(null); setConfirmDeleteId(null); }} aria-label="Tutup kelola kategori" className="p-1 rounded-full" style={{ background: "var(--bg-app)" }}>
+                <X size={13} color="var(--text-muted)" />
+              </button>
+            </div>
+            {form ? (
+              <>
+                <p style={{ color: "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }} className="mb-1.5">Nama kategori</p>
+                <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="cth: Belanja Online" maxLength={40} autoFocus
+                  className="w-full mb-3 px-3 py-2 rounded-lg outline-none" style={{ background: "var(--bg-app)", color: "var(--text-primary)", fontSize: 12.5, border: "1px solid var(--bg-selected)" }} />
+                <p style={{ color: "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }} className="mb-1.5">Pilih icon</p>
+                <div className="grid grid-cols-6 gap-1.5 mb-3">
+                  {Object.entries(ICON_MAP).map(([name, Icon]) => (
+                    <button key={name} onClick={() => setForm((f) => ({ ...f, icon: name }))} aria-label={"Icon " + name}
+                      className="flex items-center justify-center py-2 rounded-lg"
+                      style={{ background: form.icon === name ? "color-mix(in srgb, " + form.color + " 15%, transparent)" : "var(--bg-app)", color: form.icon === name ? form.color : "var(--text-muted)", boxShadow: form.icon === name ? "0 0 0 1.5px " + form.color + " inset" : "none" }}>
+                      <Icon size={15} />
+                    </button>
+                  ))}
+                </div>
+                <p style={{ color: "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }} className="mb-1.5">Pilih warna</p>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {CATEGORY_COLORS.map((c) => (
+                    <button key={c.value} title={c.label} onClick={() => setForm((f) => ({ ...f, color: c.value }))} aria-label={"Pilih warna " + c.label}
+                      style={{ width: 22, height: 22, borderRadius: 99, background: c.value, boxShadow: form.color === c.value ? "0 0 0 2px var(--bg-muted), 0 0 0 4px " + c.value : "none", flexShrink: 0 }} />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setForm(null)} className="flex-1 py-2 rounded-lg" style={{ background: "var(--bg-app)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}>Batal</button>
+                  <button onClick={handleFormSave} disabled={!form.label || !form.label.trim()}
+                    className="flex-1 py-2 rounded-lg" style={{ background: !form.label || !form.label.trim() ? "var(--bg-selected)" : "var(--blue)", color: !form.label || !form.label.trim() ? "var(--text-faint)" : "var(--bg-app)", fontSize: 12, fontWeight: 700 }}>
+                    Simpan
+                  </button>
+                </div>
+                {form.id !== null && (
+                  <>
+                    <button onClick={handleFormDelete} className="w-full mt-2 py-2 rounded-lg" style={{ background: "var(--bg-app)", color: "var(--negative)", fontSize: 12, fontWeight: 700 }}>Hapus kategori ini</button>
+                    {cats.find((c) => c.id === form.id)?.isDefault && <p style={{ color: "var(--text-faint)", fontSize: 10, marginTop: 6 }}>Kategori bawaan tidak bisa dihapus.</p>}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1 mb-2.5 max-h-52 overflow-y-auto pr-0.5">
+                  {cats.map((c) => {
+                    const Icon = ICON_MAP[c.icon] || MoreHorizontal;
+                    const confirmed = confirmDeleteId === c.id;
+                    return (
+                      <div key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg" style={{ background: "var(--bg-app)" }}>
+                        <div className="flex items-center justify-center flex-shrink-0" style={{ width: 28, height: 28, borderRadius: 8, background: "color-mix(in srgb, " + c.color + " 15%, transparent)" }}>
+                          <Icon size={14} color={c.color} />
+                        </div>
+                        <p className="flex-1 min-w-0 truncate" style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 500 }}>{c.label}</p>
+                        {confirmed ? (
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { onDeleteCategory(c.id); setConfirmDeleteId(null); }} className="px-2 py-1 rounded-lg" style={{ background: "var(--negative)", color: "var(--bg-app)", fontSize: 10, fontWeight: 700 }}>Hapus</button>
+                            <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-1 rounded-lg" style={{ background: "var(--bg-muted)", color: "var(--text-secondary)", fontSize: 10, fontWeight: 600 }}>Batal</button>
+                          </div>
+                        ) : (
+                          <>
+                            {c.isDefault && (
+                              <button onClick={() => openEditForm(c)} className="flex items-center gap-1 px-2 py-1 rounded-full flex-shrink-0" style={{ background: "var(--bg-muted)" }}>
+                                <Pencil size={10} color="var(--blue)" />
+                                <span style={{ color: "var(--blue)", fontSize: 10, fontWeight: 600 }}>Edit</span>
+                              </button>
+                            )}
+                            {!c.isDefault && (
+                              <>
+                                <button onClick={() => openEditForm(c)} aria-label={"Edit kategori " + c.label} className="p-1.5 rounded-lg flex-shrink-0"><Pencil size={12} color="var(--text-faint)" /></button>
+                                <button onClick={() => setConfirmDeleteId(c.id)} aria-label={"Hapus kategori " + c.label} className="p-1.5 rounded-lg flex-shrink-0"><Trash2 size={12} color="var(--text-faint)" /></button>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                <button onClick={() => { openAddForm(); }} className="w-full flex items-center justify-center gap-1 py-2 rounded-lg" style={{ background: "var(--bg-app)", color: "var(--blue)", fontSize: 12, fontWeight: 700 }}><Plus size={14} />Tambah kategori</button>
+              </>
+            )}
+          </div>
+        )}
 
         {mode === "keluarga" && (
           <>
@@ -1132,6 +1272,7 @@ export default function BqFinanceApp({ session }) {
   const [transactions, setTransactions] = useState([]);
   const [members, setMembers] = useState([]);
   const [budgets, setBudgets] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [activeTab, setActiveTab] = useState("beranda");
 const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -1154,11 +1295,13 @@ const [quickAddOpen, setQuickAddOpen] = useState(false);
     let mounted = true;
     (async () => {
       try {
-        const [tx, mem, bdgt] = await Promise.all([fetchTransactions(userId), fetchMembers(userId), fetchBudgets(userId)]);
+        const [tx, mem, bdgt, cats] = await Promise.all([fetchTransactions(userId), fetchMembers(userId), fetchBudgets(userId), fetchCategories(userId)]);
         if (!mounted) return;
         setTransactions(tx);
         setMembers(mem);
         setBudgets(bdgt);
+        setCategories(cats);
+        setCategoriesRef(cats);
       } catch (e) {
         console.error(e);
         setLoadError("Gagal memuat data. Periksa koneksi atau konfigurasi Supabase.");
@@ -1282,6 +1425,49 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     }
   }, [budgets]);
 
+  const handleAddCategory = useCallback(async (draft) => {
+    if (!draft || !draft.label || !draft.label.trim()) return;
+    try {
+      const cats = await insertCategory(userId, { ...draft, label: draft.label.trim() });
+      const next = [...categories, cats];
+      setCategories(next);
+      setCategoriesRef(next);
+    } catch (e) {
+      console.error(e);
+      alert("Gagal menambah kategori.");
+    }
+  }, [userId, categories]);
+
+  const handleUpdateCategory = useCallback(async (id, fields) => {
+    const prev = categories;
+    try {
+      const updated = await updateCategory(id, { label: fields.label.trim(), icon: fields.icon, color: fields.color });
+      const next = prev.map((c) => (c.id === id ? updated : c));
+      setCategories(next);
+      setCategoriesRef(next);
+    } catch (e) {
+      console.error(e);
+      setCategories(prev);
+      setCategoriesRef(prev);
+      alert("Gagal mengubah kategori.");
+    }
+  }, [categories]);
+
+  const handleDeleteCategory = useCallback(async (id) => {
+    const prev = categories;
+    const next = prev.filter((c) => c.id !== id);
+    setCategories(next);
+    setCategoriesRef(next);
+    try {
+      await deleteCategory(id);
+    } catch (e) {
+      console.error(e);
+      setCategories(prev);
+      setCategoriesRef(prev);
+      alert("Gagal menghapus kategori.");
+    }
+  }, [categories]);
+
   function handleModeChange(m) {
     setMode(m);
     localStorage.setItem("bqfinance_mode", m);
@@ -1393,10 +1579,10 @@ return (
           ) : (
             <div key={activeTab} className="bqfinance-tabfade">
               {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} modeBudgets={modeBudgets} members={members} setActiveTab={setActiveTab} openQuickAdd={() => setQuickAddOpen(true)} />}
-              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} />}
+              {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} categories={categories} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
-                <TabPengaturan mode={mode} members={members} modeTx={modeTx} modeBudgets={modeBudgets} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} />
+                <TabPengaturan mode={mode} members={members} modeTx={modeTx} modeBudgets={modeBudgets} onAddMember={handleAddMember} onDeleteMember={handleDeleteMember} onSaveBudget={handleSaveBudget} onDeleteBudget={handleDeleteBudget} onClearData={handleClearData} userEmail={userEmail} onSignOut={handleSignOut} theme={theme} onToggleTheme={() => setTheme((current) => current === "light" ? "dark" : "light")} displayName={displayName} onNameChange={handleNameChange} categories={categories} />
               )}
             </div>
           )}
@@ -1428,7 +1614,7 @@ return (
           </button>
         )}
 
-        {quickAddOpen && <QuickAddSheet mode={mode} members={members} onClose={() => setQuickAddOpen(false)} onSave={handleSaveTransaction} saving={saving} />}
+        {quickAddOpen && <QuickAddSheet mode={mode} members={members} categories={categories} onClose={() => setQuickAddOpen(false)} onSave={handleSaveTransaction} saving={saving} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
         {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} email={userEmail} avatar={avatar} name={displayName} onFileSelect={handleAvatarFile} onRemoveAvatar={handleRemoveAvatar} />}
         {cropSrc && <CropSheet src={cropSrc} onClose={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
       </div>
