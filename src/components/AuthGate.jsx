@@ -16,14 +16,27 @@ export default function AuthGate({ children }) {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setChecking(false);
-    });
+    let active = true;
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setSession(data.session);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError("Gagal terhubung ke server. Periksa koneksi internetmu lalu coba lagi.");
+      })
+      .finally(() => {
+        if (active) setChecking(false);
+      });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
     });
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   async function handleSubmit(e) {
@@ -35,15 +48,20 @@ export default function AuthGate({ children }) {
       return;
     }
     setSubmitting(true);
-    if (mode === "signin") {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message);
-    } else {
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) setError(error.message);
-      else setInfo("🎉 Akun dibuat! Buka email kamu, klik link konfirmasi (cek juga folder spam), lalu masuk di sini.");
+    try {
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) setError(error.message);
+      } else {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) setError(error.message);
+        else setInfo("🎉 Akun dibuat! Buka email kamu, klik link konfirmasi (cek juga folder spam), lalu masuk di sini.");
+      }
+    } catch {
+      setError("Terjadi kesalahan jaringan. Coba lagi.");
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }
 
   async function handleResetPassword() {
@@ -54,24 +72,34 @@ export default function AuthGate({ children }) {
     setError("");
     setInfo("");
     setSubmitting(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    });
-    setSubmitting(false);
-    if (error) setError(error.message);
-    else setInfo("📧 Link reset kata sandi sudah dikirim ke email kamu. Cek juga folder spam.");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) setError(error.message);
+      else setInfo("📧 Link reset kata sandi sudah dikirim ke email kamu. Cek juga folder spam.");
+    } catch {
+      setError("Terjadi kesalahan jaringan. Coba lagi.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleGoogleAuth() {
     setError("");
     setInfo("");
     setGoogleLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
-    });
-    if (error) setError(error.message);
-    setGoogleLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) setError(error.message);
+    } catch {
+      setError("Terjadi kesalahan jaringan. Coba lagi.");
+    } finally {
+      setGoogleLoading(false);
+    }
   }
 
   if (checking) {
