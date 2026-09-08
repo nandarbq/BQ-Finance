@@ -1,4 +1,4 @@
-import React, { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { Check, X, Loader2 } from "lucide-react";
 
 let nextId = 0;

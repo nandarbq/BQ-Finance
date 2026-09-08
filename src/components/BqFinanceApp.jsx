@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Plus, X, Home, PieChart as PieIcon, ListChecks, Settings, Users,
   UtensilsCrossed, Car, ShoppingBag, Receipt, Gamepad2, HeartPulse,
@@ -96,12 +96,8 @@ function formatDateShort(iso) {
   if (iso === yest) return "Kemarin";
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
-let categoriesRef = [];
-function setCategoriesRef(list) {
-  categoriesRef = list || [];
-}
-function getCatMeta(type, catId) {
-  const list = categoriesRef.filter((c) => c.type === type);
+function getCatMeta(categories, type, catId) {
+  const list = categories.filter((c) => c.type === type);
   const found = list.find((c) => c.label.toLowerCase() === String(catId).toLowerCase());
   if (found) return { ...found, icon: ICON_MAP[found.icon] || MoreHorizontal };
   return { label: catId, icon: MoreHorizontal, color: "var(--text-muted)", isDefault: false };
@@ -183,7 +179,7 @@ function EmptyState({ icon: Icon, title, subtitle }) {
   );
 }
 
-function ProfileAvatar({ avatar, size = 36, innerId = "sb" }) {
+function ProfileAvatar({ avatar, size = 36 }) {
   const style = {
     width: size, height: size, borderRadius: "999px", overflow: "hidden",
     flexShrink: 0, display: "block",
@@ -328,8 +324,8 @@ function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvat
   );
 }
 
-function TxDetailSheet({ tx, members, onClose, onEdit, onDelete }) {
-  const meta = getCatMeta(tx.type, tx.category);
+function TxDetailSheet({ tx, members, onClose, onEdit, onDelete, categories }) {
+  const meta = getCatMeta(categories, tx.type, tx.category);
   const Icon = meta.icon;
   const member = members.find((m) => m.id === tx.memberId);
   const fullDate = new Date(tx.date + "T00:00:00").toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -419,10 +415,6 @@ function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, on
   function isRangeMiddle(d) {
     const iso = cellISO(d);
     return mode === "range" && range.start && range.end && iso > range.start && iso < range.end;
-  }
-  function isRangeEnd(d) {
-    const iso = cellISO(d);
-    return mode === "range" && ((range.start && iso === range.start) || (range.end && iso === range.end));
   }
   function isSelected(d) {
     const iso = cellISO(d);
@@ -590,7 +582,7 @@ function OnboardingSheet({ onClose }) {
 
 /* --------------------------------- Beranda --------------------------------- */
 
-function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd }) {
+function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd, categories }) {
   const curKey = monthKeyFor(0);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
   const totalIncome = useMemo(() => modeTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [modeTx]);
@@ -613,10 +605,10 @@ const catBreakdown = useMemo(() => {
 
   const budgetRows = useMemo(() => modeBudgets.map((b) => {
     const spent = monthTx.filter((t) => t.type === "out" && t.category === b.category).reduce((s, t) => s + t.amount, 0);
-    const meta = getCatMeta("out", b.category);
+    const meta = getCatMeta(categories, "out", b.category);
     const pct = b.amount > 0 ? (spent / b.amount) * 100 : 0;
     return { ...b, meta, spent, pct };
-  }), [modeBudgets, monthTx]);
+  }), [modeBudgets, monthTx, categories]);
 
   return (
     <div className="px-4 pt-1 pb-4">
@@ -743,7 +735,7 @@ const catBreakdown = useMemo(() => {
         ) : (
           <div className="flex flex-col mt-1.5">
             {recent.map((t) => {
-              const meta = getCatMeta(t.type, t.category);
+              const meta = getCatMeta(categories, t.type, t.category);
               const Icon = meta.icon;
               const member = members.find((m) => m.id === t.memberId);
               return (
@@ -800,14 +792,14 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
       list = list.filter((t) => {
         const member = members.find((m) => m.id === t.memberId);
         const note = (t.note || "").toLowerCase();
-        const catLabel = getCatMeta(t.type, t.category).label.toLowerCase();
+        const catLabel = getCatMeta(categories, t.type, t.category).label.toLowerCase();
         const amount = String(Math.round(t.amount)).toLowerCase();
         const memberName = member ? member.name.toLowerCase() : "";
         return note.includes(q) || catLabel.includes(q) || amount.includes(q) || memberName.includes(q);
       });
     }
     return list.sort((a, b) => (b.date > a.date ? 1 : b.date < a.date ? -1 : b.createdAt - a.createdAt));
-  }, [modeTx, filter, periodRange, debouncedQuery, members]);
+  }, [modeTx, filter, periodRange, debouncedQuery, members, categories]);
 
   const summary = useMemo(() => filtered.reduce((total, t) => {
     total[t.type === "in" ? "income" : "expense"] += t.amount;
@@ -849,7 +841,7 @@ const grouped = useMemo(() => {
         ),
       ]);
       toast.resolve(id, "success", "PDF berhasil diunduh");
-    } catch (err) {
+    } catch {
       toast.resolve(id, "error", "Gagal membuat PDF. Coba lagi.");
     } finally {
       setExporting(false);
@@ -920,7 +912,7 @@ const grouped = useMemo(() => {
             <p style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 600 }} className="mb-1.5">{formatDateShort(date)}</p>
             <div className="rounded-2xl overflow-hidden" style={{ background: "var(--bg-surface)" }}>
               {txs.map((t, idx) => {
-                const meta = getCatMeta(t.type, t.category);
+                const meta = getCatMeta(categories, t.type, t.category);
                 const Icon = meta.icon;
                 const member = members.find((m) => m.id === t.memberId);
                 const isConfirm = confirmId === t.id;
@@ -1209,7 +1201,7 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
         ) : (
           <div className="flex flex-col gap-2">
             {modeBudgets.map((b) => {
-              const meta = getCatMeta("out", b.category);
+              const meta = getCatMeta(categories, "out", b.category);
               const Icon = meta.icon;
               const isConfirmBudget = confirmBudgetId === b.id;
               return (
@@ -1654,7 +1646,6 @@ export default function BqFinanceApp({ session }) {
       setMembers(mem);
       setBudgets(bdgt);
       setCategories(cats);
-      setCategoriesRef(cats);
       setLoadError("");
       return true;
     } catch (e) {
@@ -1898,7 +1889,6 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       const cats = await insertCategory(userId, { ...draft, label: draft.label.trim() });
       const next = [...categories, cats];
       setCategories(next);
-      setCategoriesRef(next);
     } catch (e) {
       console.error(e);
       toast.error("Gagal menambah kategori.");
@@ -1911,11 +1901,9 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
       const updated = await updateCategory(id, { label: fields.label.trim(), icon: fields.icon, color: fields.color });
       const next = prev.map((c) => (c.id === id ? updated : c));
       setCategories(next);
-      setCategoriesRef(next);
     } catch (e) {
       console.error(e);
       setCategories(prev);
-      setCategoriesRef(prev);
       toast.error("Gagal mengubah kategori.");
     }
   }, [categories]);
@@ -1924,13 +1912,11 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
     const prev = categories;
     const next = prev.filter((c) => c.id !== id);
     setCategories(next);
-    setCategoriesRef(next);
     try {
       await deleteCategory(id);
     } catch (e) {
       console.error(e);
       setCategories(prev);
-      setCategoriesRef(prev);
       toast.error("Gagal menghapus kategori.");
     }
   }, [categories]);
@@ -2053,7 +2039,7 @@ return (
             <div className="flex items-center justify-center h-full px-6 text-center"><span style={{ color: "var(--negative)", fontSize: 12 }}>{loadError}</span></div>
           ) : (
             <div key={activeTab} className="bqfinance-tabfade">
-              {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} modeBudgets={modeBudgets} members={members} setActiveTab={setActiveTab} openQuickAdd={openQuickAdd} />}
+              {activeTab === "beranda" && <TabBeranda mode={mode} modeTx={modeTx} modeBudgets={modeBudgets} members={members} setActiveTab={setActiveTab} openQuickAdd={openQuickAdd} categories={categories} />}
               {activeTab === "transaksi" && <TabTransaksi modeTx={modeTx} members={members} mode={mode} displayName={displayName} onDelete={handleDeleteTransaction} onEdit={openQuickEdit} onDetail={openTxDetail} categories={categories} />}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
               {activeTab === "pengaturan" && (
@@ -2090,7 +2076,7 @@ return (
 
         {showOnboarding && <OnboardingSheet onClose={dismissOnboarding} />}
         {quickAddOpen && <QuickAddSheet mode={mode} members={members} categories={categories} editingTx={editingTx} onClose={() => { setQuickAddOpen(false); setEditingTx(null); }} onSave={handleSaveTransaction} saving={saving} onAddCategory={handleAddCategory} onUpdateCategory={handleUpdateCategory} onDeleteCategory={handleDeleteCategory} />}
-        {detailTx && <TxDetailSheet tx={detailTx} members={members} onClose={() => setDetailTx(null)} onEdit={handleEditFromDetail} onDelete={handleDeleteFromDetail} />}
+        {detailTx && <TxDetailSheet tx={detailTx} members={members} categories={categories} onClose={() => setDetailTx(null)} onEdit={handleEditFromDetail} onDelete={handleDeleteFromDetail} />}
         {profileOpen && <ProfileSheet onClose={() => setProfileOpen(false)} email={userEmail} avatar={avatar} name={displayName} onFileSelect={handleAvatarFile} onRemoveAvatar={handleRemoveAvatar} />}
         {cropSrc && <CropSheet src={cropSrc} onClose={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
       </div>
