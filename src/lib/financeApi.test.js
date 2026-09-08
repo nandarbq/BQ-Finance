@@ -50,6 +50,22 @@ function setupChain(fetchResult, sResult = fetchResult) {
   chainResolvers.set(fetchResult || { data: null, error: null }, sResult || { data: null, error: null });
 }
 
+function settledChain(value) {
+  const then = (onFulfilled) => Promise.resolve(value).then(onFulfilled);
+  const self = {
+    select: () => self,
+    insert: () => self,
+    update: () => self,
+    upsert: () => self,
+    delete: () => self,
+    eq: () => self,
+    order: () => self,
+    single: () => Promise.resolve(value),
+    then,
+  };
+  return self;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   setupChain();
@@ -284,5 +300,13 @@ describe("financeApi - categories", () => {
     await deleteCategory("c1");
     expect(supabase.eq).toHaveBeenCalledWith("id", "c1");
     expect(supabase.eq).toHaveBeenCalledWith("is_default", false);
+  });
+
+  it("fetchCategories throws when seeding default categories fails", async () => {
+    supabase.from
+      .mockReturnValueOnce(settledChain({ data: [], error: null }))
+      .mockReturnValueOnce(settledChain({ data: null, error: { message: "seed failed" } }));
+
+    await expect(fetchCategories("u1")).rejects.toThrow("seed failed");
   });
 });

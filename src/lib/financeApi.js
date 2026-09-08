@@ -176,18 +176,19 @@ export async function fetchCategories(userId) {
   if (error) throw error;
   const rows = data || [];
   if (rows.length === 0) {
-    await supabase
+    const { error: seedError } = await supabase
       .from("categories")
       .upsert(
         DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId, is_default: true })),
         { onConflict: "user_id,type,label", ignoreDuplicates: true }
       );
-    const { data: seeded, error: seedError } = await supabase
+    if (seedError) throw seedError;
+    const { data: seeded, error: fetchError } = await supabase
       .from("categories")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: true });
-    if (seedError) throw seedError;
+    if (fetchError) throw fetchError;
     return (seeded || []).map(rowToCategory);
   }
   return rows.map(rowToCategory);
