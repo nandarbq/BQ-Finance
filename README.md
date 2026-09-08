@@ -60,16 +60,30 @@ Dari situ tinggal build APK/IPA lewat Android Studio / Xcode dan submit ke Play 
 ```
 src/
   lib/
-    supabaseClient.js   # koneksi ke Supabase
-    financeApi.js        # semua query database (transaksi & anggota)
+    supabaseClient.js    # koneksi ke Supabase + validasi env
+    financeApi.js        # semua query database (transaksi, anggota, budget, kategori)
+    exportPdf.js         # laporan PDF (jsPDF)
+    format.js            # helper format rupiah (dipakai bersama)
   components/
-    AuthGate.jsx          # halaman login/daftar
-    BqFinanceApp.jsx        # aplikasi utama (beranda, transaksi, grafik, pengaturan)
+    AuthGate.jsx         # halaman login/daftar/reset
+    BqFinanceApp.jsx     # aplikasi utama (beranda, transaksi, grafik, pengaturan)
+    ErrorBoundary.jsx    # penangan error React
+    Toast.jsx            # notifikasi toast
+  lib/*.test.js          # unit test (Vitest)
   App.jsx
   main.jsx
 supabase/
-  schema.sql               # skema tabel + keamanan (RLS)
+  schema.sql             # skema tabel + keamanan (RLS)
 public/
-  manifest.json             # metadata PWA (nama, ikon, warna)
-  sw.js                       # service worker minimal
+  icons/                 # ikon PWA (192/512/maskable, apple-touch)
+  favicon.svg
+index.html               # entry; berisi CSP & meta PWA
+vite.config.js           # konfig Vite, PWA (vite-plugin-pwa), CSP-strip console di prod
 ```
+
+## Tooling
+
+- **Test:** `npm run test` (Vitest)
+- **Lint:** `npm run lint` (ESLint)
+- **Format:** `npm run format` (Prettier) — cek saja: `npm run format:check`
+- **Build:** `npm run build` (output ke `dist/`, sudah termasuk PWA)
