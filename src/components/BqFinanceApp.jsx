@@ -183,30 +183,6 @@ function EmptyState({ icon: Icon, title, subtitle }) {
   );
 }
 
-function RobotAvatar({ size = 36, innerId = "sb" }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 96 96" style={{ display: "block", borderRadius: "999px", flexShrink: 0 }}>
-      <defs>
-        <linearGradient id={innerId + "-bg"} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#7fe3b8" />
-          <stop offset="100%" stopColor="#1bb87f" />
-        </linearGradient>
-      </defs>
-      <circle cx="48" cy="48" r="48" fill={"url(#" + innerId + "-bg)"} />
-      <g>
-        <line x1="48" y1="23" x2="48" y2="15" stroke="#eafff4" strokeWidth="3.5" strokeLinecap="round" />
-        <circle cx="48" cy="12" r="5" fill="#eafff4" />
-        <rect x="22" y="40" width="8" height="16" rx="4" fill="#eafff4" opacity="0.92" />
-        <rect x="66" y="40" width="8" height="16" rx="4" fill="#eafff4" opacity="0.92" />
-        <rect x="29" y="24" width="38" height="40" rx="15" fill="#fff" />
-        <circle cx="40" cy="43" r="5" fill="#0b7c53" />
-        <circle cx="56" cy="43" r="5" fill="#0b7c53" />
-        <path d="M40 54q8 8 16 0" stroke="#0b7c53" strokeWidth="3" strokeLinecap="round" fill="none" />
-      </g>
-    </svg>
-  );
-}
-
 function ProfileAvatar({ avatar, size = 36, innerId = "sb" }) {
   const style = {
     width: size, height: size, borderRadius: "999px", overflow: "hidden",
