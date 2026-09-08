@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("./supabaseClient.js", () => {
+vi.mock("./supabaseClient", () => {
   let chainResolve;
   const chainResolvers = {
     set(fetchValue, singleValue) {
@@ -27,7 +27,7 @@ vi.mock("./supabaseClient.js", () => {
   return { supabase: chain, chainResolvers };
 });
 
-import { supabase, chainResolvers } from "./supabaseClient.js";
+import { supabase, chainResolvers } from "./supabaseClient";
 import {
   fetchTransactions,
   insertTransaction,
@@ -44,7 +44,7 @@ import {
   insertCategory,
   updateCategory,
   deleteCategory,
-} from "./financeApi.js";
+} from "./financeApi";
 
 function setupChain(fetchResult, sResult = fetchResult) {
   chainResolvers.set(fetchResult || { data: null, error: null }, sResult || { data: null, error: null });
@@ -186,9 +186,7 @@ describe("financeApi - members", () => {
       color: "#4FB0A5",
       built_in: true,
     });
-    expect(result).toEqual([
-      { id: "m-bersama", name: "Bersama", color: "#4FB0A5", builtIn: true },
-    ]);
+    expect(result).toEqual([{ id: "m-bersama", name: "Bersama", color: "#4FB0A5", builtIn: true }]);
   });
 
   it("insertMember returns the mapped member", async () => {
@@ -214,9 +212,7 @@ describe("financeApi - members", () => {
 describe("financeApi - budgets", () => {
   it("fetchBudgets returns mapped budgets", async () => {
     setupChain({
-      data: [
-        { id: "b1", user_id: "u1", mode: "pribadi", category: "Makanan", amount: "1000000" },
-      ],
+      data: [{ id: "b1", user_id: "u1", mode: "pribadi", category: "Makanan", amount: "1000000" }],
       error: null,
     });
     const result = await fetchBudgets("u1");
@@ -225,7 +221,10 @@ describe("financeApi - budgets", () => {
   });
 
   it("upsertBudget sends draft and onConflict config", async () => {
-    setupChain({ data: { id: "b1", user_id: "u1", mode: "pribadi", category: "Makanan", amount: "1000000" }, error: null });
+    setupChain({
+      data: { id: "b1", user_id: "u1", mode: "pribadi", category: "Makanan", amount: "1000000" },
+      error: null,
+    });
     const result = await upsertBudget("u1", {
       mode: "pribadi",
       category: "Makanan",

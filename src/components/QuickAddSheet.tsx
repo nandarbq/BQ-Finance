@@ -1,9 +1,31 @@
 import { useState, useEffect } from "react";
+import type { ChangeEvent } from "react";
 import { X, Pencil, Plus, MoreHorizontal, Trash2, Check, Calendar } from "lucide-react";
 import { todayISO, formatDateShort } from "../lib/appUtils";
 import { ICON_MAP, CATEGORY_COLORS } from "../lib/categoryMeta";
+import type { Category, CategoryDraft, Member, Mode, Transaction, TransactionDraft, TxType } from "../lib/types";
 import { Avatar } from "./ui";
 import { CalendarSheet } from "./Sheets";
+
+interface CategoryForm {
+  id: string | null;
+  label: string;
+  icon: string;
+  color: string;
+}
+
+interface QuickAddSheetProps {
+  mode: Mode;
+  members: Member[];
+  categories: Category[];
+  onClose: () => void;
+  onSave: (draft: TransactionDraft) => void | Promise<void>;
+  saving: boolean;
+  onAddCategory: (draft: CategoryDraft) => void | Promise<void>;
+  onUpdateCategory: (id: string, fields: { label: string; icon: string; color: string }) => void | Promise<void>;
+  onDeleteCategory: (id: string) => void | Promise<void>;
+  editingTx: Transaction | null;
+}
 
 function QuickAddSheet({
   mode,
@@ -16,17 +38,17 @@ function QuickAddSheet({
   onUpdateCategory,
   onDeleteCategory,
   editingTx,
-}) {
-  const [type, setType] = useState(editingTx ? editingTx.type : "out");
+}: QuickAddSheetProps) {
+  const [type, setType] = useState<TxType>(editingTx ? editingTx.type : "out");
   const [amountStr, setAmountStr] = useState(editingTx ? String(editingTx.amount) : "");
-  const [category, setCategory] = useState(editingTx ? editingTx.category : null);
-  const [memberId, setMemberId] = useState(editingTx?.memberId || (members[0] ? members[0].id : null));
+  const [category, setCategory] = useState<string | null>(editingTx ? editingTx.category : null);
+  const [memberId, setMemberId] = useState<string | null>(editingTx?.memberId || (members[0] ? members[0].id : null));
   const [note, setNote] = useState(editingTx ? editingTx.note || "" : "");
   const [showNote, setShowNote] = useState(editingTx ? !!editingTx.note : false);
   const [date, setDate] = useState(editingTx ? editingTx.date : todayISO());
   const [managing, setManaging] = useState(false);
-  const [form, setForm] = useState(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [form, setForm] = useState<CategoryForm | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const amount = parseInt(amountStr || "0", 10);
   const cats = categories.filter((c) => c.type === type);
@@ -39,10 +61,10 @@ function QuickAddSheet({
   }, [type]);
   const canSave = amount > 0 && category && !saving;
 
-  function addChip(v) {
+  function addChip(v: number) {
     setAmountStr((prev) => String((parseInt(prev || "0", 10) || 0) + v));
   }
-  function handleAmountChange(e) {
+  function handleAmountChange(e: ChangeEvent<HTMLInputElement>) {
     setAmountStr(e.target.value.replace(/[^0-9]/g, ""));
   }
 
@@ -54,7 +76,7 @@ function QuickAddSheet({
   function openAddForm() {
     setForm({ id: null, label: "", icon: "MoreHorizontal", color: CATEGORY_COLORS[3].value });
   }
-  function openEditForm(c) {
+  function openEditForm(c: Category) {
     setForm({ id: c.id, label: c.label, icon: c.icon, color: c.color });
   }
   function handleFormSave() {
@@ -262,7 +284,7 @@ function QuickAddSheet({
                 </p>
                 <input
                   value={form.label}
-                  onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
+                  onChange={(e) => setForm((f) => (f ? { ...f, label: e.target.value } : f))}
                   placeholder="cth: Belanja Online"
                   maxLength={40}
                   autoFocus
@@ -281,7 +303,7 @@ function QuickAddSheet({
                   {Object.entries(ICON_MAP).map(([name, Icon]) => (
                     <button
                       key={name}
-                      onClick={() => setForm((f) => ({ ...f, icon: name }))}
+                      onClick={() => setForm((f) => (f ? { ...f, icon: name } : f))}
                       aria-label={"Icon " + name}
                       className="flex items-center justify-center py-2 rounded-lg"
                       style={{
@@ -305,7 +327,7 @@ function QuickAddSheet({
                     <button
                       key={c.value}
                       title={c.label}
-                      onClick={() => setForm((f) => ({ ...f, color: c.value }))}
+                      onClick={() => setForm((f) => (f ? { ...f, color: c.value } : f))}
                       aria-label={"Pilih warna " + c.label}
                       style={{
                         width: 22,
@@ -553,8 +575,10 @@ function QuickAddSheet({
           maxDate={todayISO()}
           onClose={() => setShowCalendar(false)}
           onConfirm={(iso) => {
-            setDate(iso);
-            setShowCalendar(false);
+            if (typeof iso === "string") {
+              setDate(iso);
+              setShowCalendar(false);
+            }
           }}
         />
       )}

@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import type { Dispatch, SetStateAction } from "react";
+import type { Mode, Transaction, Member, Budget, Category, TabId } from "../lib/types";
 import {
   Wallet,
   ArrowUpRight,
@@ -45,7 +47,17 @@ import { getCatMeta, ICON_MAP, MEMBER_COLORS } from "../lib/categoryMeta";
 import { Avatar, EmptyState } from "./ui";
 import { CalendarSheet } from "./Sheets";
 
-function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd, categories }) {
+interface TabBerandaProps {
+  mode: Mode;
+  modeTx: Transaction[];
+  modeBudgets: Budget[];
+  members: Member[];
+  setActiveTab: Dispatch<SetStateAction<TabId>>;
+  openQuickAdd: () => void;
+  categories: Category[];
+}
+
+function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd, categories }: TabBerandaProps) {
   const curKey = monthKeyFor(0);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
   const totalIncome = useMemo(() => modeTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [modeTx]);
@@ -355,12 +367,32 @@ function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuic
   );
 }
 
-function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, onDetail, categories }) {
-  const [filter, setFilter] = useState("all");
-  const [period, setPeriod] = useState("month");
+interface TabTransaksiProps {
+  modeTx: Transaction[];
+  members: Member[];
+  mode: Mode;
+  displayName: string;
+  onDelete: (id: string) => void | Promise<void>;
+  onEdit: (tx: Transaction) => void;
+  onDetail: (tx: Transaction) => void;
+  categories: Category[];
+}
+
+function TabTransaksi({
+  modeTx,
+  members,
+  mode,
+  displayName,
+  onDelete,
+  onEdit,
+  onDetail,
+  categories,
+}: TabTransaksiProps) {
+  const [filter, setFilter] = useState<"all" | "in" | "out">("all");
+  const [period, setPeriod] = useState<"all" | "month" | "lastMonth" | "custom">("month");
   const [startDate, setStartDate] = useState(monthRange(0).start);
   const [endDate, setEndDate] = useState(todayISO());
-  const [confirmId, setConfirmId] = useState(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [exporting, setExporting] = useState(false);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
@@ -404,7 +436,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
   );
 
   const grouped = useMemo(() => {
-    const map = {};
+    const map: Record<string, Transaction[]> = {};
     filtered.forEach((t) => {
       if (!map[t.date]) map[t.date] = [];
       map[t.date].push(t);
@@ -426,7 +458,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
     }
     setExporting(true);
     const id = toast.loading("Membuat PDF...");
-    let timeoutId;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
         exportTransactionPdf({
@@ -501,7 +533,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
         ].map((f) => (
           <button
             key={f.id}
-            onClick={() => setFilter(f.id)}
+            onClick={() => setFilter(f.id as "all" | "in" | "out")}
             className="px-3 py-1.5 rounded-full transition-colors"
             style={{
               background: filter === f.id ? "var(--blue)" : "var(--bg-muted)",
@@ -522,7 +554,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
           </div>
           <select
             value={period}
-            onChange={(e) => setPeriod(e.target.value)}
+            onChange={(e) => setPeriod(e.target.value as "all" | "month" | "lastMonth" | "custom")}
             aria-label="Pilih periode transaksi"
             className="outline-none rounded-lg px-2 py-1"
             style={{ background: "var(--bg-selected)", color: "var(--text-primary)", fontSize: 11.5 }}
@@ -551,10 +583,12 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
                 initial={{ start: startDate, end: endDate }}
                 maxDate={todayISO()}
                 onClose={() => setRangeSheetOpen(false)}
-                onConfirm={({ start, end }) => {
-                  setStartDate(start);
-                  setEndDate(end);
-                  setRangeSheetOpen(false);
+                onConfirm={(v) => {
+                  if (typeof v === "object") {
+                    setStartDate(v.start);
+                    setEndDate(v.end);
+                    setRangeSheetOpen(false);
+                  }
                 }}
               />
             )}
@@ -721,7 +755,7 @@ function TabTransaksi({ modeTx, members, mode, displayName, onDelete, onEdit, on
   );
 }
 
-function TabGrafik({ modeTx }) {
+function TabGrafik({ modeTx }: { modeTx: Transaction[] }) {
   const [offset, setOffset] = useState(0);
   const curKey = monthKeyFor(offset);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
@@ -730,7 +764,19 @@ function TabGrafik({ modeTx }) {
   const prevTotals = useMemo(() => monthTotals(modeTx, monthKeyFor(offset - 1)), [modeTx, offset]);
   const compare = useMemo(() => !(curTotals.income === 0 && curTotals.expense === 0), [curTotals]);
 
-  function renderCompareRow({ label, cur, prev, goodWhenDown, accent }) {
+  function renderCompareRow({
+    label,
+    cur,
+    prev,
+    goodWhenDown,
+    accent,
+  }: {
+    label: string;
+    cur: number;
+    prev: number;
+    goodWhenDown: boolean;
+    accent: string;
+  }) {
     const delta = deltaPct(cur, prev);
     const up = delta > 0;
     const flat = delta === 0;
@@ -779,7 +825,7 @@ function TabGrafik({ modeTx }) {
   const totalMonth = catBreakdown.reduce((s, c) => s + c.value, 0);
 
   const weekData = useMemo(() => {
-    const days = [];
+    const days: { label: string; income: number; expense: number }[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -880,7 +926,7 @@ function TabGrafik({ modeTx }) {
                     ))}
                   </Pie>
                   <RTooltip
-                    formatter={(v) => formatRupiah(v)}
+                    formatter={(v) => formatRupiah(Number(v))}
                     contentStyle={{ background: "var(--bg-muted)", border: "none", borderRadius: 10, fontSize: 11 }}
                     itemStyle={{ color: "var(--text-primary)" }}
                   />
@@ -927,7 +973,7 @@ function TabGrafik({ modeTx }) {
               />
               <YAxis hide />
               <RTooltip
-                formatter={(v) => formatRupiah(v)}
+                formatter={(v) => formatRupiah(Number(v))}
                 contentStyle={{ background: "var(--bg-muted)", border: "none", borderRadius: 10, fontSize: 11 }}
                 itemStyle={{ color: "var(--text-primary)" }}
                 cursor={{ fill: "rgba(255,255,255,0.03)" }}
@@ -952,6 +998,25 @@ function TabGrafik({ modeTx }) {
   );
 }
 
+interface TabPengaturanProps {
+  mode: Mode;
+  members: Member[];
+  modeBudgets: Budget[];
+  onAddMember: (name: string, color: string) => void | Promise<void>;
+  onDeleteMember: (id: string) => void | Promise<void>;
+  onSaveBudget: (category: string, amount: number) => void | Promise<void>;
+  onDeleteBudget: (id: string) => void | Promise<void>;
+  onClearData: () => void | Promise<void>;
+  modeTx: Transaction[];
+  userEmail: string;
+  onSignOut: () => void | Promise<void>;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
+  displayName: string;
+  onNameChange: (name: string) => void;
+  categories: Category[];
+}
+
 function TabPengaturan({
   mode,
   members,
@@ -969,7 +1034,7 @@ function TabPengaturan({
   displayName,
   onNameChange,
   categories,
-}) {
+}: TabPengaturanProps) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(MEMBER_COLORS[0]);
@@ -977,10 +1042,10 @@ function TabPengaturan({
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState(displayName);
   const [showAddBudget, setShowAddBudget] = useState(false);
-  const [budgetCat, setBudgetCat] = useState(null);
+  const [budgetCat, setBudgetCat] = useState<string | null>(null);
   const [budgetAmount, setBudgetAmount] = useState("");
-  const [confirmBudgetId, setConfirmBudgetId] = useState(null);
-  const [confirmMemberId, setConfirmMemberId] = useState(null);
+  const [confirmBudgetId, setConfirmBudgetId] = useState<string | null>(null);
+  const [confirmMemberId, setConfirmMemberId] = useState<string | null>(null);
 
   const memberTotals = useMemo(
     () =>

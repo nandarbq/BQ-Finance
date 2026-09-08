@@ -1,7 +1,7 @@
 import React from "react";
-import AuthGate from "./components/AuthGate.jsx";
-import BqFinanceApp from "./components/BqFinanceApp.jsx";
-import ErrorBoundary from "./components/ErrorBoundary.jsx";
+import AuthGate from "./components/AuthGate";
+import BqFinanceApp from "./components/BqFinanceApp";
+import ErrorBoundary from "./components/ErrorBoundary";
 import logoUrl from "./assets/logo bq-finance.png";
 
 export default function App() {
@@ -10,7 +10,7 @@ export default function App() {
     document.documentElement.dataset.theme = theme;
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", theme === "dark" ? "#121212" : "#00ab6b");
-    let favicon = document.querySelector('link[rel="icon"]');
+    let favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
     if (!favicon) {
       favicon = document.createElement("link");
       favicon.rel = "icon";

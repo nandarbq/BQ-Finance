@@ -29,8 +29,10 @@ import {
   Stethoscope,
   Camera,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { Category, TxType } from "./types";
 
-const ICON_MAP = {
+export const ICON_MAP: Record<string, LucideIcon> = {
   UtensilsCrossed,
   Car,
   ShoppingBag,
@@ -62,7 +64,7 @@ const ICON_MAP = {
   Camera,
 };
 
-const CATEGORY_COLORS = [
+export const CATEGORY_COLORS: { label: string; value: string }[] = [
   { label: "Merah", value: "var(--negative)" },
   { label: "Biru", value: "var(--blue)" },
   { label: "Hijau", value: "var(--cat-green)" },
@@ -75,7 +77,7 @@ const CATEGORY_COLORS = [
   { label: "Abu", value: "var(--text-muted)" },
 ];
 
-const MEMBER_COLORS = [
+export const MEMBER_COLORS: string[] = [
   "var(--blue)",
   "var(--cat-teal)",
   "var(--negative)",
@@ -84,11 +86,13 @@ const MEMBER_COLORS = [
   "var(--positive)",
 ];
 
-function getCatMeta(categories, type, catId) {
+export interface CategoryMeta extends Omit<Category, "icon"> {
+  icon: LucideIcon;
+}
+
+export function getCatMeta(categories: Category[], type: TxType, catId: string): CategoryMeta {
   const list = categories.filter((c) => c.type === type);
   const found = list.find((c) => c.label.toLowerCase() === String(catId).toLowerCase());
   if (found) return { ...found, icon: ICON_MAP[found.icon] || MoreHorizontal };
-  return { label: catId, icon: MoreHorizontal, color: "var(--text-muted)", isDefault: false };
+  return { id: "", label: catId, icon: MoreHorizontal, color: "var(--text-muted)", isDefault: false, type };
 }
-
-export { ICON_MAP, CATEGORY_COLORS, MEMBER_COLORS, getCatMeta };

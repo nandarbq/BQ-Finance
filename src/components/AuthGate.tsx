@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import { Eye, EyeOff } from "lucide-react";
 import logoUrl from "../assets/logo bq-finance.png";
 
-export default function AuthGate({ children }) {
-  const [session, setSession] = useState(null);
+interface AuthGateProps {
+  children: (session: Session) => ReactNode;
+}
+
+export default function AuthGate({ children }: AuthGateProps) {
+  const [session, setSession] = useState<Session | null>(null);
   const [checking, setChecking] = useState(true);
-  const [mode, setMode] = useState("signin"); // signin | signup
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -39,7 +45,7 @@ export default function AuthGate({ children }) {
     };
   }, []);
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setInfo("");
@@ -55,7 +61,8 @@ export default function AuthGate({ children }) {
       } else {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) setError(error.message);
-        else setInfo("🎉 Akun dibuat! Buka email kamu, klik link konfirmasi (cek juga folder spam), lalu masuk di sini.");
+        else
+          setInfo("🎉 Akun dibuat! Buka email kamu, klik link konfirmasi (cek juga folder spam), lalu masuk di sini.");
       }
     } catch {
       setError("Terjadi kesalahan jaringan. Coba lagi.");
@@ -107,9 +114,21 @@ export default function AuthGate({ children }) {
       <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "var(--bg-page)" }}>
         <div
           className="flex items-center justify-center bqfinance-logo-pop"
-          style={{ width: 96, height: 96, borderRadius: 26, overflow: "hidden", background: "var(--bg-surface)", boxShadow: "0 12px 40px var(--shadow)" }}
+          style={{
+            width: 96,
+            height: 96,
+            borderRadius: 26,
+            overflow: "hidden",
+            background: "var(--bg-surface)",
+            boxShadow: "0 12px 40px var(--shadow)",
+          }}
         >
-          <img src={logoUrl} alt="BQ Finance" className="bqfinance-logo-breathe" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          <img
+            src={logoUrl}
+            alt="BQ Finance"
+            className="bqfinance-logo-breathe"
+            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          />
         </div>
       </div>
     );
@@ -117,7 +136,10 @@ export default function AuthGate({ children }) {
 
   if (!session) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center px-5" style={{ background: "var(--bg-page)" }}>
+      <div
+        className="min-h-screen w-full flex items-center justify-center px-5"
+        style={{ background: "var(--bg-page)" }}
+      >
         <div className="w-full" style={{ maxWidth: 360 }}>
           <div className="flex flex-col items-center mb-6">
             <div
@@ -126,7 +148,9 @@ export default function AuthGate({ children }) {
             >
               <img src={logoUrl} alt="BQ Finance" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             </div>
-            <p style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 22 }}>
+            <p
+              style={{ fontFamily: "'Sora', sans-serif", color: "var(--text-primary)", fontWeight: 800, fontSize: 22 }}
+            >
               BQ <span style={{ color: "var(--blue)" }}>Finance</span>
             </p>
             <p style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 2 }}>Catat uangmu tanpa ribet</p>
@@ -136,14 +160,24 @@ export default function AuthGate({ children }) {
             <button
               onClick={() => setMode("signin")}
               className="flex-1 py-2 rounded-lg"
-              style={{ background: mode === "signin" ? "var(--bg-selected)" : "transparent", color: mode === "signin" ? "var(--text-primary)" : "var(--text-muted)", fontSize: 12.5, fontWeight: 600 }}
+              style={{
+                background: mode === "signin" ? "var(--bg-selected)" : "transparent",
+                color: mode === "signin" ? "var(--text-primary)" : "var(--text-muted)",
+                fontSize: 12.5,
+                fontWeight: 600,
+              }}
             >
               Masuk
             </button>
             <button
               onClick={() => setMode("signup")}
               className="flex-1 py-2 rounded-lg"
-              style={{ background: mode === "signup" ? "var(--bg-selected)" : "transparent", color: mode === "signup" ? "var(--text-primary)" : "var(--text-muted)", fontSize: 12.5, fontWeight: 600 }}
+              style={{
+                background: mode === "signup" ? "var(--bg-selected)" : "transparent",
+                color: mode === "signup" ? "var(--text-primary)" : "var(--text-muted)",
+                fontSize: 12.5,
+                fontWeight: 600,
+              }}
             >
               Daftar
             </button>
@@ -156,7 +190,12 @@ export default function AuthGate({ children }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
               className="w-full px-3.5 py-3 rounded-xl outline-none"
-              style={{ background: "var(--bg-surface)", color: "var(--text-primary)", fontSize: 13, border: "1px solid var(--bg-selected)" }}
+              style={{
+                background: "var(--bg-surface)",
+                color: "var(--text-primary)",
+                fontSize: 13,
+                border: "1px solid var(--bg-selected)",
+              }}
             />
             <div className="relative">
               <input
@@ -165,7 +204,12 @@ export default function AuthGate({ children }) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Kata sandi"
                 className="w-full px-3.5 py-3 rounded-xl outline-none"
-                style={{ background: "var(--bg-surface)", color: "var(--text-primary)", fontSize: 13, border: "1px solid var(--bg-selected)" }}
+                style={{
+                  background: "var(--bg-surface)",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  border: "1px solid var(--bg-selected)",
+                }}
               />
               <button
                 type="button"
@@ -185,7 +229,16 @@ export default function AuthGate({ children }) {
                 onClick={handleResetPassword}
                 disabled={submitting}
                 className="self-end"
-                style={{ background: "none", border: "none", color: "var(--blue)", fontSize: 11.5, fontWeight: 600, cursor: "pointer", opacity: submitting ? 0.6 : 1, marginTop: -4 }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--blue)",
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  opacity: submitting ? 0.6 : 1,
+                  marginTop: -4,
+                }}
               >
                 Lupa kata sandi?
               </button>
@@ -194,7 +247,13 @@ export default function AuthGate({ children }) {
               type="submit"
               disabled={submitting}
               className="w-full py-3 rounded-xl mt-1"
-              style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700, opacity: submitting ? 0.7 : 1 }}
+              style={{
+                background: "var(--blue)",
+                color: "var(--bg-app)",
+                fontSize: 13,
+                fontWeight: 700,
+                opacity: submitting ? 0.7 : 1,
+              }}
             >
               {mode === "signin" ? "Masuk" : "Buat akun"}
             </button>
@@ -211,15 +270,36 @@ export default function AuthGate({ children }) {
             onClick={handleGoogleAuth}
             disabled={googleLoading}
             className="w-full py-3 rounded-xl flex items-center justify-center gap-2"
-            style={{ background: "var(--bg-surface)", color: "var(--text-primary)", fontSize: 13, fontWeight: 600, border: "1px solid var(--bg-selected)", opacity: googleLoading ? 0.7 : 1 }}
+            style={{
+              background: "var(--bg-surface)",
+              color: "var(--text-primary)",
+              fontSize: 13,
+              fontWeight: 600,
+              border: "1px solid var(--bg-selected)",
+              opacity: googleLoading ? 0.7 : 1,
+            }}
           >
             <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
-              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+              />
+              <path
+                fill="#4285F4"
+                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+              />
+              <path
+                fill="#34A853"
+                d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+              />
             </svg>
-            <span>{googleLoading ? "Memproses..." : mode === "signin" ? "Masuk dengan Google" : "Daftar dengan Google"}</span>
+            <span>
+              {googleLoading ? "Memproses..." : mode === "signin" ? "Masuk dengan Google" : "Daftar dengan Google"}
+            </span>
           </button>
         </div>
       </div>

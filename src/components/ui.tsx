@@ -1,6 +1,15 @@
+import type { CSSProperties } from "react";
+import type { LucideIcon } from "lucide-react";
 import defaultRobotAvatar from "../assets/avatar robot bq finance.png";
 
-function Avatar({ name, color, size = 32, ring = false }) {
+interface AvatarProps {
+  name: string;
+  color: string;
+  size?: number;
+  ring?: boolean;
+}
+
+function Avatar({ name, color, size = 32, ring = false }: AvatarProps) {
   const initial = (name || "?").trim().charAt(0).toUpperCase();
   return (
     <div
@@ -25,7 +34,13 @@ function Avatar({ name, color, size = 32, ring = false }) {
   );
 }
 
-function EmptyState({ icon: Icon, title, subtitle }) {
+interface EmptyStateProps {
+  icon: LucideIcon;
+  title: string;
+  subtitle?: string;
+}
+
+function EmptyState({ icon: Icon, title, subtitle }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-10 px-6">
       <div
@@ -42,7 +57,13 @@ function EmptyState({ icon: Icon, title, subtitle }) {
   );
 }
 
-function ProfileAvatar({ avatar, size = 36 }) {
+interface ProfileAvatarProps {
+  avatar: string | null;
+  size?: number;
+  innerId?: string;
+}
+
+function ProfileAvatar({ avatar, size = 36, innerId }: ProfileAvatarProps) {
   const style = {
     width: size,
     height: size,
@@ -52,7 +73,15 @@ function ProfileAvatar({ avatar, size = 36 }) {
     display: "block",
   };
   if (avatar) {
-    return <img src={avatar} alt="Foto profil" referrerPolicy="no-referrer" style={{ ...style, objectFit: "cover" }} />;
+    return (
+      <img
+        key={innerId}
+        src={avatar}
+        alt="Foto profil"
+        referrerPolicy="no-referrer"
+        style={{ ...style, objectFit: "cover" }}
+      />
+    );
   }
   return (
     <img
@@ -63,7 +92,7 @@ function ProfileAvatar({ avatar, size = 36 }) {
   );
 }
 
-function SkeletonBlock({ style }) {
+function SkeletonBlock({ style }: { style: CSSProperties }) {
   return <div className="bqfinance-skeleton" style={{ background: "var(--bg-muted)", borderRadius: 10, ...style }} />;
 }
 

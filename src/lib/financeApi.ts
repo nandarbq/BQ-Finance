@@ -1,6 +1,29 @@
+import type {
+  Budget,
+  BudgetDraft,
+  Category,
+  CategoryDraft,
+  Member,
+  Mode,
+  Transaction,
+  TransactionDraft,
+  TxType,
+} from "./types";
 import { supabase } from "./supabaseClient";
 
-function rowToTx(row) {
+interface TxRow {
+  id: string;
+  mode: Mode;
+  type: TxType;
+  amount: number | string;
+  category: string;
+  note: string | null;
+  date: string;
+  member_id: string | null;
+  created_at: string;
+}
+
+function rowToTx(row: TxRow): Transaction {
   return {
     id: row.id,
     mode: row.mode,
@@ -14,11 +37,49 @@ function rowToTx(row) {
   };
 }
 
-function rowToMember(row) {
+interface MemberRow {
+  id: string;
+  name: string;
+  color: string;
+  built_in: boolean;
+}
+
+function rowToMember(row: MemberRow): Member {
   return { id: row.id, name: row.name, color: row.color, builtIn: row.built_in };
 }
 
-export async function fetchTransactions(userId) {
+interface BudgetRow {
+  id: string;
+  mode: Mode;
+  category: string;
+  amount: number | string;
+}
+
+function rowToBudget(row: BudgetRow): Budget {
+  return { id: row.id, mode: row.mode, category: row.category, amount: Number(row.amount) };
+}
+
+interface CategoryRow {
+  id: string;
+  type: TxType;
+  label: string;
+  icon: string;
+  color: string;
+  is_default: boolean;
+}
+
+function rowToCategory(row: CategoryRow): Category {
+  return {
+    id: row.id,
+    type: row.type,
+    label: row.label,
+    icon: row.icon,
+    color: row.color,
+    isDefault: row.is_default,
+  };
+}
+
+export async function fetchTransactions(userId: string): Promise<Transaction[]> {
   const { data, error } = await supabase
     .from("transactions")
     .select("*")
@@ -29,7 +90,7 @@ export async function fetchTransactions(userId) {
   return (data || []).map(rowToTx);
 }
 
-export async function insertTransaction(userId, draft) {
+export async function insertTransaction(userId: string, draft: TransactionDraft): Promise<Transaction> {
   const { data, error } = await supabase
     .from("transactions")
     .insert({
@@ -48,12 +109,12 @@ export async function insertTransaction(userId, draft) {
   return rowToTx(data);
 }
 
-export async function deleteTransactionById(id) {
+export async function deleteTransactionById(id: string): Promise<void> {
   const { error } = await supabase.from("transactions").delete().eq("id", id);
   if (error) throw error;
 }
 
-export async function updateTransaction(id, draft) {
+export async function updateTransaction(id: string, draft: Omit<TransactionDraft, "mode">): Promise<Transaction> {
   const { data, error } = await supabase
     .from("transactions")
     .update({
@@ -71,12 +132,12 @@ export async function updateTransaction(id, draft) {
   return rowToTx(data);
 }
 
-export async function deleteTransactionsByMode(userId, mode) {
+export async function deleteTransactionsByMode(userId: string, mode: Mode): Promise<void> {
   const { error } = await supabase.from("transactions").delete().eq("user_id", userId).eq("mode", mode);
   if (error) throw error;
 }
 
-export async function fetchMembers(userId) {
+export async function fetchMembers(userId: string): Promise<Member[]> {
   const { data, error } = await supabase
     .from("members")
     .select("*")
@@ -90,7 +151,7 @@ export async function fetchMembers(userId) {
   return data.map(rowToMember);
 }
 
-export async function insertMember(userId, name, color, builtIn = false) {
+export async function insertMember(userId: string, name: string, color: string, builtIn = false): Promise<Member> {
   const { data, error } = await supabase
     .from("members")
     .insert({ user_id: userId, name, color, built_in: builtIn })
@@ -100,16 +161,12 @@ export async function insertMember(userId, name, color, builtIn = false) {
   return rowToMember(data);
 }
 
-export async function deleteMemberById(id) {
+export async function deleteMemberById(id: string): Promise<void> {
   const { error } = await supabase.from("members").delete().eq("id", id);
   if (error) throw error;
 }
 
-function rowToBudget(row) {
-  return { id: row.id, mode: row.mode, category: row.category, amount: Number(row.amount) };
-}
-
-export async function fetchBudgets(userId) {
+export async function fetchBudgets(userId: string): Promise<Budget[]> {
   const { data, error } = await supabase
     .from("budgets")
     .select("*")
@@ -119,7 +176,7 @@ export async function fetchBudgets(userId) {
   return (data || []).map(rowToBudget);
 }
 
-export async function upsertBudget(userId, draft) {
+export async function upsertBudget(userId: string, draft: BudgetDraft): Promise<Budget> {
   const { data, error } = await supabase
     .from("budgets")
     .upsert(
@@ -132,14 +189,14 @@ export async function upsertBudget(userId, draft) {
   return rowToBudget(data);
 }
 
-export async function deleteBudgetById(id) {
+export async function deleteBudgetById(id: string): Promise<void> {
   const { error } = await supabase.from("budgets").delete().eq("id", id);
   if (error) throw error;
 }
 
 /* ================================ Categories ================================ */
 
-const DEFAULT_CATEGORIES = [
+const DEFAULT_CATEGORIES: CategoryDraft[] = [
   { type: "out", label: "Makanan", icon: "UtensilsCrossed", color: "var(--negative)" },
   { type: "out", label: "Transport", icon: "Car", color: "var(--cat-teal)" },
   { type: "out", label: "Belanja", icon: "ShoppingBag", color: "var(--blue)" },
@@ -156,18 +213,7 @@ const DEFAULT_CATEGORIES = [
   { type: "in", label: "Lainnya", icon: "MoreHorizontal", color: "var(--text-muted)" },
 ];
 
-function rowToCategory(row) {
-  return {
-    id: row.id,
-    type: row.type,
-    label: row.label,
-    icon: row.icon,
-    color: row.color,
-    isDefault: row.is_default,
-  };
-}
-
-export async function fetchCategories(userId) {
+export async function fetchCategories(userId: string): Promise<Category[]> {
   const { data, error } = await supabase
     .from("categories")
     .select("*")
@@ -176,12 +222,10 @@ export async function fetchCategories(userId) {
   if (error) throw error;
   const rows = data || [];
   if (rows.length === 0) {
-    const { error: seedError } = await supabase
-      .from("categories")
-      .upsert(
-        DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId, is_default: true })),
-        { onConflict: "user_id,type,label", ignoreDuplicates: true }
-      );
+    const { error: seedError } = await supabase.from("categories").upsert(
+      DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId, is_default: true })),
+      { onConflict: "user_id,type,label", ignoreDuplicates: true }
+    );
     if (seedError) throw seedError;
     const { data: seeded, error: fetchError } = await supabase
       .from("categories")
@@ -194,7 +238,7 @@ export async function fetchCategories(userId) {
   return rows.map(rowToCategory);
 }
 
-export async function insertCategory(userId, draft) {
+export async function insertCategory(userId: string, draft: CategoryDraft): Promise<Category> {
   const { data, error } = await supabase
     .from("categories")
     .insert({
@@ -211,7 +255,10 @@ export async function insertCategory(userId, draft) {
   return rowToCategory(data);
 }
 
-export async function updateCategory(id, fields) {
+export async function updateCategory(
+  id: string,
+  fields: { label: string; icon: string; color: string }
+): Promise<Category> {
   const { data, error } = await supabase
     .from("categories")
     .update({ label: fields.label, icon: fields.icon, color: fields.color })
@@ -222,11 +269,7 @@ export async function updateCategory(id, fields) {
   return rowToCategory(data);
 }
 
-export async function deleteCategory(id) {
-  const { error } = await supabase
-    .from("categories")
-    .delete()
-    .eq("id", id)
-    .eq("is_default", false);
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from("categories").delete().eq("id", id).eq("is_default", false);
   if (error) throw error;
 }

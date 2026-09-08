@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import type { CSSProperties, PointerEvent, ReactElement } from "react";
+import type { LucideIcon } from "lucide-react";
 import {
   X,
   Check,
@@ -17,28 +19,36 @@ import {
 import { todayISO, formatDateShort } from "../lib/appUtils";
 import { formatRupiah } from "../lib/format";
 import { getCatMeta } from "../lib/categoryMeta";
+import type { Category, Member, Transaction } from "../lib/types";
 import { Avatar, ProfileAvatar } from "./ui";
 
-function CropSheet({ src, onClose, onConfirm }) {
+interface CropSheetProps {
+  src: string;
+  onClose: () => void;
+  onConfirm: (dataUrl: string) => void;
+}
+
+function CropSheet({ src, onClose, onConfirm }: CropSheetProps) {
   const V = 280;
   const OUT = 512;
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [extra, setExtra] = useState(null);
-  const imgRef = useRef(null);
-  const dragRef = useRef(null);
+  const [extra, setExtra] = useState<{ base: number; dw: number; dh: number } | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
 
   const dw = extra ? extra.dw * scale : 0;
   const dh = extra ? extra.dh * scale : 0;
   const maxX = Math.max(0, dw - V);
   const maxY = Math.max(0, dh - V);
 
-  function clampOffset(o) {
+  function clampOffset(o: { x: number; y: number }) {
     return { x: Math.min(Math.max(o.x, 0), maxX), y: Math.min(Math.max(o.y, 0), maxY) };
   }
 
   function onImgLoad() {
     const img = imgRef.current;
+    if (!img) return;
     const base = Math.max(V / img.naturalWidth, V / img.naturalHeight);
     setExtra({ base, dw: img.naturalWidth * base, dh: img.naturalHeight * base });
     setOffset({
@@ -47,7 +57,8 @@ function CropSheet({ src, onClose, onConfirm }) {
     });
   }
 
-  function handleZoom(next) {
+  function handleZoom(next: number) {
+    if (!extra) return;
     const z = Math.min(Math.max(next, 1), 4);
     const centerX = (offset.x + V / 2) * (z / scale);
     const centerY = (offset.y + V / 2) * (z / scale);
@@ -60,17 +71,17 @@ function CropSheet({ src, onClose, onConfirm }) {
     });
   }
 
-  function onPointerDown(e) {
+  function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: offset.x, oy: offset.y };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
-  function onPointerMove(e) {
+  function onPointerMove(e: PointerEvent<HTMLDivElement>) {
     if (!dragRef.current) return;
     const dx = e.clientX - dragRef.current.sx;
     const dy = e.clientY - dragRef.current.sy;
     setOffset(clampOffset({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy }));
   }
-  function onPointerUp(e) {
+  function onPointerUp(e: PointerEvent<HTMLDivElement>) {
     if (dragRef.current && e.currentTarget.hasPointerCapture(e.pointerId))
       e.currentTarget.releasePointerCapture(e.pointerId);
     dragRef.current = null;
@@ -78,11 +89,13 @@ function CropSheet({ src, onClose, onConfirm }) {
 
   function handleConfirm() {
     const img = imgRef.current;
+    if (!img || !extra) return;
     const s = extra.base * scale;
     const canvas = document.createElement("canvas");
     canvas.width = OUT;
     canvas.height = OUT;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     ctx.drawImage(img, offset.x / s, offset.y / s, V / s, V / s, 0, 0, OUT, OUT);
     onConfirm(canvas.toDataURL("image/jpeg", 0.9));
   }
@@ -130,17 +143,19 @@ function CropSheet({ src, onClose, onConfirm }) {
             draggable={false}
             onLoad={onImgLoad}
             alt="Pratinjau foto profil"
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              width: dw,
-              height: dh,
-              maxWidth: "none",
-              userSelect: "none",
-              WebkitUserDrag: "none",
-              transform: "translate(" + -offset.x + "px," + -offset.y + "px)",
-            }}
+            style={
+              {
+                position: "absolute",
+                left: 0,
+                top: 0,
+                width: dw,
+                height: dh,
+                maxWidth: "none",
+                userSelect: "none",
+                WebkitUserDrag: "none",
+                transform: "translate(" + -offset.x + "px," + -offset.y + "px)",
+              } as CSSProperties
+            }
           />
         </div>
         <div className="flex items-center gap-3 mt-5 px-1">
@@ -170,8 +185,17 @@ function CropSheet({ src, onClose, onConfirm }) {
   );
 }
 
-function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvatar }) {
-  const fileRef = useRef(null);
+interface ProfileSheetProps {
+  onClose: () => void;
+  email: string;
+  avatar: string | null;
+  name: string;
+  onFileSelect: (file: File) => void;
+  onRemoveAvatar: () => void;
+}
+
+function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvatar }: ProfileSheetProps) {
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   function pickFile() {
     if (fileRef.current) fileRef.current.click();
@@ -255,7 +279,16 @@ function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvat
   );
 }
 
-function TxDetailSheet({ tx, members, onClose, onEdit, onDelete, categories }) {
+interface TxDetailSheetProps {
+  tx: Transaction;
+  members: Member[];
+  onClose: () => void;
+  onEdit: (tx: Transaction) => void;
+  onDelete: (id: string) => void;
+  categories: Category[];
+}
+
+function TxDetailSheet({ tx, members, onClose, onEdit, onDelete, categories }: TxDetailSheetProps) {
   const meta = getCatMeta(categories, tx.type, tx.category);
   const Icon = meta.icon;
   const member = members.find((m) => m.id === tx.memberId);
@@ -384,7 +417,18 @@ function TxDetailSheet({ tx, members, onClose, onEdit, onDelete, categories }) {
   );
 }
 
-function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, onConfirm }) {
+export type CalendarValue = string | { start: string; end: string };
+
+interface CalendarSheetProps {
+  mode?: "single" | "range";
+  initial?: string | { start?: string; end?: string };
+  minDate?: string;
+  maxDate?: string;
+  onClose: () => void;
+  onConfirm: (value: CalendarValue) => void;
+}
+
+function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, onConfirm }: CalendarSheetProps) {
   const today = todayISO();
   const WEEK = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
   const MONTHS = [
@@ -401,38 +445,48 @@ function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, on
     "November",
     "Desember",
   ];
-  const initialISO = mode === "range" ? initial?.start : initial;
+  const initialISO =
+    mode === "range" && typeof initial === "object" && initial
+      ? initial.start
+      : typeof initial === "string"
+        ? initial
+        : undefined;
 
   const [view, setView] = useState(() => {
     const base = initialISO ? new Date(initialISO + "T00:00:00") : new Date();
     return { y: base.getFullYear(), m: base.getMonth() };
   });
-  const [sel, setSel] = useState(mode === "single" ? initial || null : null);
-  const [range, setRange] = useState(
-    mode === "range" ? { start: initial?.start || null, end: initial?.end || null } : { start: null, end: null }
+  const [sel, setSel] = useState<string | null>(mode === "single" ? initialISO || null : null);
+  const [range, setRange] = useState<{ start: string | null; end: string | null }>(
+    mode === "range"
+      ? {
+          start: typeof initial === "object" && initial && initial.start ? initial.start : null,
+          end: typeof initial === "object" && initial && initial.end ? initial.end : null,
+        }
+      : { start: null, end: null }
   );
 
   const firstIdx = (new Date(view.y, view.m, 1).getDay() + 6) % 7;
   const dim = new Date(view.y, view.m + 1, 0).getDate();
 
-  function cellISO(d) {
+  function cellISO(d: number) {
     return view.y + "-" + String(view.m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
   }
-  function isDisabled(d) {
+  function isDisabled(d: number) {
     const iso = cellISO(d);
-    return (minDate && iso < minDate) || (maxDate && iso > maxDate);
+    return Boolean((minDate && iso < minDate) || (maxDate && iso > maxDate));
   }
-  function isRangeMiddle(d) {
+  function isRangeMiddle(d: number) {
     const iso = cellISO(d);
     return mode === "range" && range.start && range.end && iso > range.start && iso < range.end;
   }
-  function isSelected(d) {
+  function isSelected(d: number) {
     const iso = cellISO(d);
     if (mode === "single") return iso === sel;
     return (range.start && iso === range.start) || (range.end && iso === range.end);
   }
 
-  function handleDay(d) {
+  function handleDay(d: number) {
     const iso = cellISO(d);
     if (isDisabled(d)) return;
     if (mode === "single") {
@@ -453,7 +507,7 @@ function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, on
   }
   function handleConfirm() {
     if (!canConfirm()) return;
-    if (mode === "range") onConfirm({ start: range.start, end: range.end });
+    if (mode === "range" && range.start && range.end) onConfirm({ start: range.start, end: range.end });
   }
 
   function goPrev() {
@@ -478,7 +532,7 @@ function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, on
     }
   }
 
-  const cells = [];
+  const cells: ReactElement[] = [];
   for (let i = 0; i < firstIdx; i++) cells.push(<div key={"pad" + i} />);
   for (let d = 1; d <= dim; d++) {
     const iso = cellISO(d);
@@ -603,8 +657,12 @@ function CalendarSheet({ mode = "single", initial, minDate, maxDate, onClose, on
   );
 }
 
-function OnboardingSheet({ onClose }) {
-  const items = [
+interface OnboardingSheetProps {
+  onClose: () => void;
+}
+
+function OnboardingSheet({ onClose }: OnboardingSheetProps) {
+  const items: { icon: LucideIcon; color: string; text: string }[] = [
     {
       icon: PiggyBank,
       color: "var(--blue)",

@@ -1,4 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import type { TouchEvent } from "react";
+import type { LucideIcon } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
 import { Plus, Home, PieChart as PieIcon, ListChecks, Settings, Users, Download, WifiOff, Loader2 } from "lucide-react";
 import { toast } from "./Toast";
 import { supabase } from "../lib/supabaseClient";
@@ -20,50 +23,64 @@ import {
   deleteCategory,
 } from "../lib/financeApi";
 import { nameFromEmail } from "../lib/appUtils";
+import type { Budget, Category, CategoryDraft, Member, Mode, TabId, Transaction, TransactionDraft } from "../lib/types";
 import { ProfileAvatar, LoadingSkeleton } from "./ui";
 import { CropSheet, ProfileSheet, TxDetailSheet, OnboardingSheet } from "./Sheets";
 import { QuickAddSheet } from "./QuickAddSheet";
 import { TabBeranda, TabTransaksi, TabGrafik, TabPengaturan } from "./Tabs";
 
-export default function BqFinanceApp({ session }) {
+interface BeforeInstallPromptEventShim extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+
+interface BqFinanceAppProps {
+  session: Session;
+}
+
+export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const userId = session.user.id;
-  const userEmail = session.user.email;
+  const userEmail = session.user.email || "";
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [pullActive, setPullActive] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [pullHeight, setPullHeight] = useState(0);
-  const [mode, setMode] = useState(() => localStorage.getItem("bqfinance_mode") || "pribadi");
-  const [transactions, setTransactions] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [budgets, setBudgets] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [activeTab, setActiveTab] = useState("beranda");
+  const [mode, setMode] = useState<Mode>(() =>
+    localStorage.getItem("bqfinance_mode") === "keluarga" ? "keluarga" : "pribadi"
+  );
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [activeTab, setActiveTab] = useState<TabId>("beranda");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [editingTx, setEditingTx] = useState(null);
-  const [detailTx, setDetailTx] = useState(null);
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
+  const [detailTx, setDetailTx] = useState<Transaction | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [theme, setTheme] = useState(() => localStorage.getItem("bq_finance_theme") || "light");
-  const [avatar, setAvatar] = useState(() => localStorage.getItem("bqfinance_avatar_" + userId) || null);
+  const [theme, setTheme] = useState<"light" | "dark">(() =>
+    localStorage.getItem("bq_finance_theme") === "dark" ? "dark" : "light"
+  );
+  const [avatar, setAvatar] = useState<string | null>(() => localStorage.getItem("bqfinance_avatar_" + userId) || null);
   const [displayName, setDisplayName] = useState(
     () => localStorage.getItem("bqfinance_name_" + userId) || nameFromEmail(userEmail)
   );
-  const [cropSrc, setCropSrc] = useState(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem("bqfinance_onboarded_" + userId));
-  const [installEvent, setInstallEvent] = useState(null);
-  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
-  const scrollRef = useRef(null);
-  const pullRef = useRef(null);
+  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEventShim | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const pullRef = useRef<number | null>(null);
 
   const isStandalone =
     typeof window !== "undefined" &&
     (window.matchMedia("(display-mode: standalone)").matches ||
       window.matchMedia("(display-mode: minimal-ui)").matches ||
       window.matchMedia("(display-mode: fullscreen)").matches ||
-      window.navigator.standalone);
+      (window.navigator as Navigator & { standalone?: boolean }).standalone);
 
   const loadData = useCallback(async () => {
     try {
@@ -104,7 +121,7 @@ export default function BqFinanceApp({ session }) {
     setRefreshing(false);
   }, [loadData]);
 
-  const onPullStart = useCallback((e) => {
+  const onPullStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
     if (!el || el.scrollTop > 0) return;
     pullRef.current = e.touches[0].clientY;
@@ -112,7 +129,7 @@ export default function BqFinanceApp({ session }) {
     setPullDistance(0);
   }, []);
 
-  const onPullMove = useCallback((e) => {
+  const onPullMove = useCallback((e: TouchEvent<HTMLDivElement>) => {
     if (!pullRef.current) return;
     const el = scrollRef.current;
     if (!el || el.scrollTop > 0) {
@@ -155,9 +172,9 @@ export default function BqFinanceApp({ session }) {
   }, [theme]);
 
   useEffect(() => {
-    const onPrompt = (e) => {
+    const onPrompt = (e: Event) => {
       e.preventDefault();
-      setInstallEvent(e);
+      setInstallEvent(e as BeforeInstallPromptEventShim);
     };
     const onInstalled = () => setInstallEvent(null);
     const onOnline = () => setIsOnline(true);
@@ -177,7 +194,7 @@ export default function BqFinanceApp({ session }) {
   const modeBudgets = useMemo(() => budgets.filter((b) => b.mode === mode), [budgets, mode]);
 
   const handleSaveTransaction = useCallback(
-    async (draft) => {
+    async (draft: TransactionDraft) => {
       setSaving(true);
       try {
         if (editingTx) {
@@ -204,24 +221,24 @@ export default function BqFinanceApp({ session }) {
     setQuickAddOpen(true);
   }, []);
 
-  const openQuickEdit = useCallback((tx) => {
+  const openQuickEdit = useCallback((tx: Transaction) => {
     setDetailTx(null);
     setEditingTx(tx);
     setQuickAddOpen(true);
   }, []);
 
-  const openTxDetail = useCallback((tx) => {
+  const openTxDetail = useCallback((tx: Transaction) => {
     setDetailTx(tx);
   }, []);
 
-  const handleEditFromDetail = useCallback((tx) => {
+  const handleEditFromDetail = useCallback((tx: Transaction) => {
     setDetailTx(null);
     setEditingTx(tx);
     setQuickAddOpen(true);
   }, []);
 
   const handleDeleteTransaction = useCallback(
-    async (id) => {
+    async (id: string) => {
       const target = transactions.find((t) => t.id === id);
       const prev = transactions;
       setTransactions((p) => p.filter((t) => t.id !== id));
@@ -263,7 +280,7 @@ export default function BqFinanceApp({ session }) {
   );
 
   const handleDeleteFromDetail = useCallback(
-    (id) => {
+    (id: string) => {
       setDetailTx(null);
       handleDeleteTransaction(id);
     },
@@ -283,7 +300,7 @@ export default function BqFinanceApp({ session }) {
   }, [transactions, mode, userId]);
 
   const handleAddMember = useCallback(
-    async (name, color) => {
+    async (name: string, color: string) => {
       if (!name || !name.trim()) return;
       try {
         const m = await insertMember(userId, name.trim(), color, false);
@@ -297,7 +314,7 @@ export default function BqFinanceApp({ session }) {
   );
 
   const handleDeleteMember = useCallback(
-    async (id) => {
+    async (id: string) => {
       const prev = members;
       setMembers((p) => p.filter((m) => m.id !== id));
       try {
@@ -312,7 +329,7 @@ export default function BqFinanceApp({ session }) {
   );
 
   const handleSaveBudget = useCallback(
-    async (category, amount) => {
+    async (category: string, amount: number) => {
       if (!category || !amount || amount <= 0) return;
       try {
         const b = await upsertBudget(userId, { mode, category, amount });
@@ -329,7 +346,7 @@ export default function BqFinanceApp({ session }) {
   );
 
   const handleDeleteBudget = useCallback(
-    async (id) => {
+    async (id: string) => {
       const prev = budgets;
       setBudgets((p) => p.filter((b) => b.id !== id));
       try {
@@ -344,7 +361,7 @@ export default function BqFinanceApp({ session }) {
   );
 
   const handleAddCategory = useCallback(
-    async (draft) => {
+    async (draft: CategoryDraft) => {
       if (!draft || !draft.label || !draft.label.trim()) return;
       try {
         const cats = await insertCategory(userId, { ...draft, label: draft.label.trim() });
@@ -359,7 +376,7 @@ export default function BqFinanceApp({ session }) {
   );
 
   const handleUpdateCategory = useCallback(
-    async (id, fields) => {
+    async (id: string, fields: { label: string; icon: string; color: string }) => {
       const prev = categories;
       try {
         const updated = await updateCategory(id, {
@@ -379,7 +396,7 @@ export default function BqFinanceApp({ session }) {
   );
 
   const handleDeleteCategory = useCallback(
-    async (id) => {
+    async (id: string) => {
       const prev = categories;
       const next = prev.filter((c) => c.id !== id);
       setCategories(next);
@@ -394,7 +411,7 @@ export default function BqFinanceApp({ session }) {
     [categories]
   );
 
-  function handleModeChange(m) {
+  function handleModeChange(m: Mode) {
     setMode(m);
     localStorage.setItem("bqfinance_mode", m);
   }
@@ -419,18 +436,18 @@ export default function BqFinanceApp({ session }) {
     }
   }
 
-  function handleAvatarFile(file) {
+  function handleAvatarFile(file: File) {
     if (!file || !file.type.startsWith("image/")) {
       toast.error("Pilih file gambar untuk foto profil.");
       return;
     }
     const reader = new FileReader();
     reader.onerror = () => toast.error("Gagal memuat foto. Coba gunakan gambar lain.");
-    reader.onload = () => setCropSrc(reader.result);
+    reader.onload = () => setCropSrc(reader.result as string);
     reader.readAsDataURL(file);
   }
 
-  function handleCropConfirm(dataUrl) {
+  function handleCropConfirm(dataUrl: string) {
     setAvatar(dataUrl);
     localStorage.setItem("bqfinance_avatar_" + userId, dataUrl);
     setCropSrc(null);
@@ -446,7 +463,7 @@ export default function BqFinanceApp({ session }) {
     setShowOnboarding(false);
   }
 
-  function handleNameChange(next) {
+  function handleNameChange(next: string) {
     const clean = (next || "").trim();
     const final = clean || nameFromEmail(userEmail);
     setDisplayName(final);
@@ -581,7 +598,6 @@ export default function BqFinanceApp({ session }) {
           onTouchEnd={onPullEnd}
         >
           <div
-            ref={pullRef}
             className={refreshing || pullActive ? "flex items-center justify-center py-0" : "hidden"}
             style={{
               height: refreshing || pullActive ? pullHeight : 0,
@@ -667,17 +683,18 @@ export default function BqFinanceApp({ session }) {
             { id: "grafik", label: "Grafik", icon: PieIcon },
             { id: "pengaturan", label: "Pengaturan", icon: Settings },
           ].map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
+            const item = t as { id: TabId; label: string; icon: LucideIcon };
+            const Icon = item.icon;
+            const active = activeTab === item.id;
             return (
               <button
-                key={t.id}
-                onClick={() => setActiveTab(t.id)}
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
                 className="flex-1 flex flex-col items-center gap-0.5 py-2"
               >
                 <Icon size={18} color={active ? "var(--blue)" : "var(--text-faint)"} strokeWidth={active ? 2.4 : 2} />
                 <span style={{ color: active ? "var(--blue)" : "var(--text-faint)", fontSize: 9.5, fontWeight: 600 }}>
-                  {t.label}
+                  {item.label}
                 </span>
               </button>
             );

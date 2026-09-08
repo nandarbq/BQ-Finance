@@ -1,22 +1,46 @@
 import { useSyncExternalStore } from "react";
+import type { ReactNode } from "react";
 import { Check, X, Loader2 } from "lucide-react";
 
-let nextId = 0;
-let toasts = [];
-const listeners = new Set();
-const timers = new Map();
+type ToastType = "loading" | "success" | "error";
 
-function setToasts(update) {
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+interface ToastItem {
+  id: string;
+  type: ToastType;
+  message: string;
+  action?: ToastAction;
+}
+
+interface ToastOpts {
+  id?: string;
+  action?: ToastAction;
+  duration?: number;
+  loadingMs?: number;
+}
+
+let nextId = 0;
+let toasts: ToastItem[] = [];
+const listeners = new Set<() => void>();
+const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function setToasts(update: ToastItem[] | ((prev: ToastItem[]) => ToastItem[])) {
   toasts = typeof update === "function" ? update(toasts) : update;
   listeners.forEach((l) => l());
 }
 
-function subscribe(listener) {
+function subscribe(listener: () => void) {
   listeners.add(listener);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
-function clearTimer(id) {
+function clearTimer(id: string) {
   const t = timers.get(id);
   if (t) {
     clearTimeout(t);
@@ -24,39 +48,36 @@ function clearTimer(id) {
   }
 }
 
-function dismiss(id) {
+function dismiss(id: string) {
   setToasts((prev) => prev.filter((t) => t.id !== id));
   clearTimer(id);
 }
 
-function setTimer(id, fn, ms) {
+function setTimer(id: string, fn: () => void, ms: number) {
   clearTimer(id);
   timers.set(id, setTimeout(fn, ms));
 }
 
-function push(type, message, opts = {}) {
+function push(type: ToastType, message: string, opts: ToastOpts = {}) {
   const id = (opts.id ?? "toast") + "-" + ++nextId;
   setToasts((prev) => [...prev, { id, type, message, action: opts.action }]);
-  const duration =
-    type === "loading" ? opts.loadingMs ?? 12000 : opts.duration ?? 2600;
+  const duration = type === "loading" ? (opts.loadingMs ?? 12000) : (opts.duration ?? 2600);
   setTimer(id, () => dismiss(id), duration);
   return id;
 }
 
 export const toast = {
-  loading(message) {
+  loading(message: string) {
     return push("loading", message);
   },
-  success(message, opts) {
+  success(message: string, opts?: ToastOpts) {
     return push("success", message, opts);
   },
-  error(message, opts) {
+  error(message: string, opts?: ToastOpts) {
     return push("error", message, opts);
   },
-  resolve(id, type, message, opts = {}) {
-    setToasts((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, type, message } : t))
-    );
+  resolve(id: string, type: ToastType, message: string, opts: ToastOpts = {}) {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, type, message } : t)));
     if (type !== "loading") {
       setTimer(id, () => dismiss(id), opts.duration ?? 2600);
     }
@@ -64,7 +85,7 @@ export const toast = {
   dismiss,
 };
 
-export function ToastProvider({ children }) {
+export function ToastProvider({ children }: { children: ReactNode }) {
   const items = useSyncExternalStore(subscribe, () => toasts);
 
   return (
@@ -94,16 +115,17 @@ export function ToastProvider({ children }) {
   );
 }
 
-function Toast({ toast, onDismiss }) {
-  const config = {
+function Toast({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }) {
+  const config: Record<ToastType, { bg: string; border: string; color: string }> = {
     loading: { bg: "var(--bg-surface)", border: "var(--border)", color: "var(--text-primary)" },
     success: { bg: "var(--bg-surface)", border: "var(--positive)", color: "var(--positive)" },
     error: { bg: "var(--bg-surface)", border: "var(--negative)", color: "var(--negative)" },
-  }[toast.type];
+  };
+  const style = config[toast.type];
 
   return (
     <div
-      onClick={!(toast.action) && (toast.type === "success" || toast.type === "error") ? onDismiss : undefined}
+      onClick={!toast.action && (toast.type === "success" || toast.type === "error") ? onDismiss : undefined}
       role={toast.type === "success" || toast.type === "error" ? "status" : undefined}
       style={{
         display: "flex",
@@ -112,8 +134,8 @@ function Toast({ toast, onDismiss }) {
         maxWidth: "100%",
         padding: "10px 14px",
         borderRadius: 12,
-        background: config.bg,
-        border: "1px solid " + config.border,
+        background: style.bg,
+        border: "1px solid " + style.border,
         boxShadow: "0 8px 28px var(--shadow)",
         color: "var(--text-primary)",
         fontSize: 12.5,
@@ -132,8 +154,23 @@ function Toast({ toast, onDismiss }) {
       <span style={{ color: "var(--text-primary)" }}>{toast.message}</span>
       {toast.action && (
         <button
-          onClick={(e) => { e.stopPropagation(); toast.action.onClick(); onDismiss(); }}
-          style={{ background: "var(--blue)", color: "var(--bg-app)", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", flexShrink: 0, marginLeft: 4 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            toast.action!.onClick();
+            onDismiss();
+          }}
+          style={{
+            background: "var(--blue)",
+            color: "var(--bg-app)",
+            border: "none",
+            borderRadius: 8,
+            padding: "5px 12px",
+            fontSize: 11.5,
+            fontWeight: 700,
+            cursor: "pointer",
+            flexShrink: 0,
+            marginLeft: 4,
+          }}
         >
           {toast.action.label}
         </button>

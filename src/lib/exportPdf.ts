@@ -2,8 +2,9 @@ import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import logoDataUrl from "../assets/logo bq-finance.png?inline";
 import { formatRupiah } from "./format";
+import type { Category, Member, Mode, Transaction, TxType } from "./types";
 
-const CAT_LABELS = {
+const CAT_LABELS: Record<TxType, Record<string, string>> = {
   in: {
     gaji: "Gaji",
     bonus: "Bonus",
@@ -31,27 +32,41 @@ const INK = [30, 41, 59];
 const MUTED = [100, 116, 139];
 const LINE = [226, 232, 240];
 
-let categoriesRef = [];
+let categoriesRef: Category[] = [];
 
-function categoryLabel(type, catId) {
+function categoryLabel(type: TxType, catId: string): string {
   const found = categoriesRef.find((c) => c.type === type && c.label.toLowerCase() === String(catId).toLowerCase());
   if (found) return found.label;
   const list = CAT_LABELS[type] || {};
   return list[catId] || catId || "Lainnya";
 }
 
-function formatAmount(type, n) {
+function formatAmount(type: TxType, n: number): string {
   return (type === "in" ? "+" : "-") + formatRupiah(n);
 }
 
-export async function exportTransactionPdf({ transactions, members, mode = "pribadi", periodLabel = "", displayName = "", categories = [] }) {
+export async function exportTransactionPdf({
+  transactions,
+  members,
+  mode = "pribadi",
+  periodLabel = "",
+  displayName = "",
+  categories = [],
+}: {
+  transactions: Transaction[];
+  members: Member[];
+  mode?: Mode;
+  periodLabel?: string;
+  displayName?: string;
+  categories?: Category[];
+}): Promise<void> {
   categoriesRef = categories || [];
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const marginX = 42;
 
-  const memberName = (id) => {
+  const memberName = (id: string | null): string => {
     const m = members.find((x) => x.id === id);
     return m ? m.name : "";
   };
@@ -87,13 +102,17 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
   doc.setFontSize(10);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
   doc.text("Periode: " + periodLabel + "  |  Mode " + (mode === "keluarga" ? "Keluarga" : "Pribadi"), marginX, 122);
-  doc.text(transactions.length + " transaksi  |  Disusun oleh " + (displayName || "-") + "  |  " + generatedAt, marginX, 138);
+  doc.text(
+    transactions.length + " transaksi  |  Disusun oleh " + (displayName || "-") + "  |  " + generatedAt,
+    marginX,
+    138
+  );
 
   const boxGap = 10;
   const boxW = (pageW - 2 * marginX - 2 * boxGap) / 3;
   const boxY = 162;
   const boxH = 56;
-  const boxes = [
+  const boxes: { label: string; value: string; bg: number[]; fg: number[] }[] = [
     { label: "Pemasukan", value: formatRupiah(income), bg: [234, 253, 239], fg: GREEN },
     { label: "Pengeluaran", value: formatRupiah(expense), bg: [254, 231, 231], fg: RED },
     { label: "Selisih", value: formatRupiah(balance), bg: [237, 244, 253], fg: balance >= 0 ? GREEN : RED },
@@ -112,24 +131,23 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
   });
 
   const withMember = mode === "keluarga";
-  const head = withMember
+  const head: string[][] = withMember
     ? [["No", "Tanggal", "Kategori", "Keterangan", "Anggota", "Jenis", "Jumlah"]]
     : [["No", "Tanggal", "Kategori", "Keterangan", "Jenis", "Jumlah"]];
 
-  const body = transactions.map((t, i) => {
-    const row = [
-      String(i + 1),
-      t.date,
-      categoryLabel(t.type, t.category),
-      t.note || "-",
-    ];
+  const body: string[][] = transactions.map((t, i) => {
+    const row: string[] = [String(i + 1), t.date, categoryLabel(t.type, t.category), t.note || "-"];
     if (withMember) row.push(memberName(t.memberId));
     row.push(t.type === "in" ? "Pemasukan" : "Pengeluaran");
     row.push(formatAmount(t.type, t.amount));
     return row;
   });
 
-  const foot = [["", "", "", "", "Total Pemasukan", formatAmount("in", income)], ["", "", "", "", "Total Pengeluaran", formatAmount("out", expense)], ["", "", "", "", "Selisih", formatRupiah(balance)]];
+  const foot: string[][] = [
+    ["", "", "", "", "Total Pemasukan", formatAmount("in", income)],
+    ["", "", "", "", "Total Pengeluaran", formatAmount("out", expense)],
+    ["", "", "", "", "Selisih", formatRupiah(balance)],
+  ];
   if (withMember) {
     foot.forEach((r) => r.splice(4, 0, ""));
   }
@@ -153,7 +171,7 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
       1: { cellWidth: 72 },
       [amountCol]: { halign: "right" },
     },
-    didParseCell: (data) => {
+    didParseCell: (data: any) => {
       if (data.section === "body" && data.column.index === amountCol) {
         const tx = transactions[data.row.index];
         data.cell.styles.textColor = tx && tx.type === "in" ? GREEN : RED;
@@ -166,9 +184,9 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
         data.cell.styles.fontStyle = "bold";
       }
     },
-  });
+  } as any);
 
-  const pageCount = doc.internal.getNumberOfPages();
+  const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(8.5);
@@ -178,7 +196,12 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
     doc.text("Halaman " + i + " dari " + pageCount, pageW - marginX, pageH - 16, { align: "right" });
   }
 
-  const safeName = (periodLabel || "periode").replace(/[^a-z0-9]+/gi, "-").toLowerCase().trim().replace(/^-+|-+$/g, "") || "periode";
+  const safeName =
+    (periodLabel || "periode")
+      .replace(/[^a-z0-9]+/gi, "-")
+      .toLowerCase()
+      .trim()
+      .replace(/^-+|-+$/g, "") || "periode";
   const fileName = "Laporan-Transaksi-" + safeName + ".pdf";
 
   const blob = doc.output("blob");
