@@ -91,6 +91,9 @@ create policy "members_select_own" on members
 drop policy if exists "members_insert_own" on members;
 create policy "members_insert_own" on members
   for insert with check (auth.uid() = user_id);
+drop policy if exists "members_update_own" on members;
+create policy "members_update_own" on members
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists "members_delete_own" on members;
 create policy "members_delete_own" on members
   for delete using (auth.uid() = user_id);
@@ -101,6 +104,9 @@ create policy "transactions_select_own" on transactions
 drop policy if exists "transactions_insert_own" on transactions;
 create policy "transactions_insert_own" on transactions
   for insert with check (auth.uid() = user_id);
+drop policy if exists "transactions_update_own" on transactions;
+create policy "transactions_update_own" on transactions
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists "transactions_delete_own" on transactions;
 create policy "transactions_delete_own" on transactions
   for delete using (auth.uid() = user_id);
