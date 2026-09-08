@@ -29,6 +29,19 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          charts: ["recharts"],
+          supabase: ["@supabase/supabase-js"],
+          pdf: ["jspdf", "jspdf-autotable"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
   },
