@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import logoDataUrl from "../assets/logo bq-finance.png?inline";
+import { formatRupiah } from "./format";
 
 const CAT_LABELS = {
   in: {
@@ -39,13 +40,8 @@ function categoryLabel(type, catId) {
   return list[catId] || catId || "Lainnya";
 }
 
-function rupiah(n) {
-  const v = Math.round(Math.abs(Number(n) || 0));
-  return "Rp " + v.toLocaleString("id-ID");
-}
-
 function formatAmount(type, n) {
-  return (type === "in" ? "+" : "-") + rupiah(n);
+  return (type === "in" ? "+" : "-") + formatRupiah(n);
 }
 
 export async function exportTransactionPdf({ transactions, members, mode = "pribadi", periodLabel = "", displayName = "", categories = [] }) {
@@ -98,9 +94,9 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
   const boxY = 162;
   const boxH = 56;
   const boxes = [
-    { label: "Pemasukan", value: rupiah(income), bg: [234, 253, 239], fg: GREEN },
-    { label: "Pengeluaran", value: rupiah(expense), bg: [254, 231, 231], fg: RED },
-    { label: "Selisih", value: rupiah(balance), bg: [237, 244, 253], fg: balance >= 0 ? GREEN : RED },
+    { label: "Pemasukan", value: formatRupiah(income), bg: [234, 253, 239], fg: GREEN },
+    { label: "Pengeluaran", value: formatRupiah(expense), bg: [254, 231, 231], fg: RED },
+    { label: "Selisih", value: formatRupiah(balance), bg: [237, 244, 253], fg: balance >= 0 ? GREEN : RED },
   ];
   boxes.forEach((b, i) => {
     const x = marginX + i * (boxW + boxGap);
@@ -133,7 +129,7 @@ export async function exportTransactionPdf({ transactions, members, mode = "prib
     return row;
   });
 
-  const foot = [["", "", "", "", "Total Pemasukan", formatAmount("in", income)], ["", "", "", "", "Total Pengeluaran", formatAmount("out", expense)], ["", "", "", "", "Selisih", rupiah(balance)]];
+  const foot = [["", "", "", "", "Total Pemasukan", formatAmount("in", income)], ["", "", "", "", "Total Pengeluaran", formatAmount("out", expense)], ["", "", "", "", "Selisih", formatRupiah(balance)]];
   if (withMember) {
     foot.forEach((r) => r.splice(4, 0, ""));
   }
