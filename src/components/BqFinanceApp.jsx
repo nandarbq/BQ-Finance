@@ -22,6 +22,7 @@ import {
   fetchCategories, insertCategory, updateCategory, deleteCategory,
 } from "../lib/financeApi";
 import { exportTransactionPdf } from "../lib/exportPdf";
+import { formatRupiah } from "../lib/format";
 import defaultRobotAvatar from "../assets/avatar robot bq finance.png";
 
 /* ----------------------------- Konstanta & util ---------------------------- */
@@ -49,10 +50,6 @@ const CATEGORY_COLORS = [
 
 const MEMBER_COLORS = ["var(--blue)", "var(--cat-teal)", "var(--negative)", "var(--cat-lime)", "var(--cat-dark)", "var(--positive)"];
 
-function formatRupiah(n) {
-  const v = Number(n) || 0;
-  return "Rp " + Math.round(v).toLocaleString("id-ID");
-}
 function nameFromEmail(email) {
   const base = (email || "").split("@")[0] || "Pengguna";
   return base.charAt(0).toUpperCase() + base.slice(1);
@@ -111,6 +108,14 @@ function monthTotals(list, key) {
   const income = monthTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0);
   const expense = monthTx.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0);
   return { income, expense, balance: income - expense };
+}
+function buildCatBreakdown(monthTx) {
+  const map = { in: 0, out: 0 };
+  monthTx.forEach((t) => { map[t.type] += t.amount; });
+  return [
+    { name: "Pemasukan", value: map.in, type: "in", color: "var(--positive)" },
+    { name: "Pengeluaran", value: map.out, type: "out", color: "var(--negative)" },
+  ].filter((c) => c.value > 0);
 }
 function budgetColor(pct) {
   if (pct >= 100) return "var(--negative)";
@@ -592,14 +597,7 @@ function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuic
   const monthIncome = useMemo(() => monthTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [monthTx]);
   const monthExpense = useMemo(() => monthTx.filter((t) => t.type === "out").reduce((s, t) => s + t.amount, 0), [monthTx]);
 
-const catBreakdown = useMemo(() => {
-    const map = { in: 0, out: 0 };
-    monthTx.forEach((t) => { map[t.type] += t.amount; });
-    return [
-      { name: "Pemasukan", value: map.in, color: "var(--positive)" },
-      { name: "Pengeluaran", value: map.out, color: "var(--negative)" },
-    ].filter((c) => c.value > 0);
-  }, [monthTx]);
+const catBreakdown = useMemo(() => buildCatBreakdown(monthTx), [monthTx]);
 
   const recent = useMemo(() => [...modeTx].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5), [modeTx]);
 
@@ -826,6 +824,7 @@ const grouped = useMemo(() => {
     }
     setExporting(true);
     const id = toast.loading("Membuat PDF...");
+    let timeoutId;
     try {
       await Promise.race([
         exportTransactionPdf({
@@ -836,12 +835,14 @@ const grouped = useMemo(() => {
           displayName,
           categories,
         }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 20000)
-        ),
+        new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("timeout")), 20000);
+        }),
       ]);
+      clearTimeout(timeoutId);
       toast.resolve(id, "success", "PDF berhasil diunduh");
     } catch {
+      clearTimeout(timeoutId);
       toast.resolve(id, "error", "Gagal membuat PDF. Coba lagi.");
     } finally {
       setExporting(false);
@@ -984,14 +985,7 @@ function TabGrafik({ modeTx }) {
     );
   }
 
-const catBreakdown = useMemo(() => {
-    const map = { in: 0, out: 0 };
-    monthTx.forEach((t) => { map[t.type] += t.amount; });
-    return [
-      { name: "Pemasukan", value: map.in, type: "in", color: "var(--positive)" },
-      { name: "Pengeluaran", value: map.out, type: "out", color: "var(--negative)" },
-    ].filter((c) => c.value > 0);
-  }, [monthTx]);
+const catBreakdown = useMemo(() => buildCatBreakdown(monthTx), [monthTx]);
   const totalMonth = catBreakdown.reduce((s, c) => s + c.value, 0);
 
   const weekData = useMemo(() => {
@@ -1255,7 +1249,7 @@ function TabPengaturan({ mode, members, modeBudgets, onAddMember, onDeleteMember
                   <X size={13} color="var(--text-muted)" />
                 </button>
               </div>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama anggota"
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama anggota" maxLength={40}
                 className="w-full mb-2 px-3 py-2 rounded-lg outline-none" style={{ background: "var(--bg-app)", color: "var(--text-primary)", fontSize: 12.5, border: "1px solid var(--bg-selected)" }} />
               <div className="flex items-center gap-2 mb-2.5">
                 {MEMBER_COLORS.map((c) => (
@@ -1536,7 +1530,7 @@ function QuickAddSheet({ mode, members, categories, onClose, onSave, saving, onA
           {!showNote ? <button onClick={() => setShowNote(true)} style={{ color: "var(--text-muted)", fontSize: 11 }}>+ Tambah catatan</button> : null}
         </div>
         {showNote && (
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Catatan singkat (opsional)"
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Catatan singkat (opsional)" maxLength={120}
             className="w-full mb-4 px-3 py-2 rounded-lg outline-none" style={{ background: "var(--bg-muted)", color: "var(--text-primary)", fontSize: 12, border: "1px solid var(--bg-selected)" }} />
         )}
 
@@ -1927,14 +1921,23 @@ const modeTx = useMemo(() => transactions.filter((t) => t.mode === mode), [trans
   }
 
 async function handleSignOut() {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      toast.error("Gagal keluar. Periksa koneksi lalu coba lagi.");
+    }
   }
 
   async function handleInstallApp() {
     if (!installEvent) return;
-    installEvent.prompt();
-    await installEvent.userChoice;
-    setInstallEvent(null);
+    try {
+      installEvent.prompt();
+      await installEvent.userChoice;
+    } catch {
+      toast.error("Gagal menginstal aplikasi. Coba lagi.");
+    } finally {
+      setInstallEvent(null);
+    }
   }
 
   function handleAvatarFile(file) {
