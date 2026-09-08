@@ -8,10 +8,11 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "tsc --noEmit && eslint src vite.config.js",
+    "test:e2e": "playwright test",
+    "lint": "tsc --noEmit && eslint src e2e vite.config.js playwright.config.js",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\" vite.config.js eslint.config.js index.html",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\" vite.config.js eslint.config.js index.html"
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx}\" e2e vite.config.js playwright.config.js eslint.config.js index.html",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\" e2e vite.config.js playwright.config.js eslint.config.js index.html"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@typescript-eslint/eslint-plugin": "^8.70.0",

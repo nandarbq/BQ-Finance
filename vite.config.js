@@ -9,7 +9,7 @@ export function stripConsoleInProd() {
     enforce: "post",
     transform(code, id) {
       const normalized = id.split("\\").join("/");
-      if (!normalized.includes("/src/") || /\.test\.(js|jsx)$/.test(normalized)) {
+      if (!normalized.includes("/src/") || /\.test\.(js|jsx|ts|tsx)$/.test(normalized)) {
         return null;
       }
       return {
@@ -80,5 +80,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+  },
+  test: {
+    include: ["src/**/*.test.{ts,tsx,js,jsx}"],
   },
 });
