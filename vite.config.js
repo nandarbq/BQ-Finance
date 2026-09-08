@@ -2,9 +2,28 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+export function stripConsoleInProd() {
+  return {
+    name: "strip-console-in-prod",
+    apply: "build",
+    enforce: "post",
+    transform(code, id) {
+      const normalized = id.split("\\").join("/");
+      if (!normalized.includes("/src/") || /\.test\.(js|jsx)$/.test(normalized)) {
+        return null;
+      }
+      return {
+        code: code.replace(/\bconsole\.(?:error|warn)\s*\(/g, "/* DROPPED_console */ ("),
+        map: null,
+      };
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
+    stripConsoleInProd(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png"],
