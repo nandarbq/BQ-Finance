@@ -1044,6 +1044,7 @@ function TabPengaturan({
   const [showAddBudget, setShowAddBudget] = useState(false);
   const [budgetCat, setBudgetCat] = useState<string | null>(null);
   const [budgetAmount, setBudgetAmount] = useState("");
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [confirmBudgetId, setConfirmBudgetId] = useState<string | null>(null);
   const [confirmMemberId, setConfirmMemberId] = useState<string | null>(null);
 
@@ -1154,7 +1155,12 @@ function TabPengaturan({
             <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Anggaran</p>
           </div>
           <button
-            onClick={() => setShowAddBudget((v) => !v)}
+            onClick={() => {
+              setEditingBudget(null);
+              setBudgetCat(null);
+              setBudgetAmount("");
+              setShowAddBudget((v) => !v);
+            }}
             className="flex items-center gap-1 px-2.5 py-1 rounded-full"
             style={{ background: "var(--bg-muted)" }}
           >
@@ -1268,6 +1274,84 @@ function TabPengaturan({
               const meta = getCatMeta(categories, "out", b.category);
               const Icon = meta.icon;
               const isConfirmBudget = confirmBudgetId === b.id;
+              const isEditing = editingBudget?.id === b.id;
+              if (isEditing) {
+                return (
+                  <div key={b.id} className="rounded-xl p-3" style={{ background: "var(--bg-muted)" }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className="flex items-center justify-center"
+                          style={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: 9,
+                            background: "color-mix(in srgb, " + meta.color + " 15%, transparent)",
+                          }}
+                        >
+                          <Icon size={14} color={meta.color} />
+                        </div>
+                        <p style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>Edit Anggaran</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setEditingBudget(null);
+                          setBudgetCat(null);
+                          setBudgetAmount("");
+                        }}
+                        className="p-1 rounded-full"
+                        style={{ background: "var(--bg-app)" }}
+                      >
+                        <X size={13} color="var(--text-muted)" />
+                      </button>
+                    </div>
+                    <p style={{ color: "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }} className="mb-1.5">
+                      {meta.label}
+                    </p>
+                    <div
+                      className="flex items-center gap-1.5 mb-2.5 px-3 py-2 rounded-lg"
+                      style={{ background: "var(--bg-app)", border: "1px solid var(--bg-selected)" }}
+                    >
+                      <span style={{ color: "var(--text-muted)", fontSize: 12.5, fontWeight: 600 }}>Rp</span>
+                      <input
+                        inputMode="numeric"
+                        value={budgetAmount ? Number(budgetAmount).toLocaleString("id-ID") : ""}
+                        onChange={(e) => setBudgetAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="0"
+                        className="w-full outline-none bg-transparent"
+                        style={{ color: "var(--text-primary)", fontSize: 12.5, border: "none" }}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingBudget(null);
+                          setBudgetCat(null);
+                          setBudgetAmount("");
+                        }}
+                        className="flex-1 py-2 rounded-lg"
+                        style={{ background: "var(--bg-app)", color: "var(--text-secondary)", fontSize: 12, fontWeight: 600 }}
+                      >
+                        Batal
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (parseInt(budgetAmount, 10) > 0) {
+                            onSaveBudget(b.category, parseInt(budgetAmount, 10));
+                            setEditingBudget(null);
+                            setBudgetCat(null);
+                            setBudgetAmount("");
+                          }
+                        }}
+                        className="flex-1 py-2 rounded-lg"
+                        style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 12, fontWeight: 700 }}
+                      >
+                        Simpan
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={b.id} className="flex items-center gap-2.5">
                   <div
@@ -1288,9 +1372,24 @@ function TabPengaturan({
                     <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>{formatRupiah(b.amount)} / bulan</p>
                   </div>
                   {!isConfirmBudget ? (
-                    <button onClick={() => setConfirmBudgetId(b.id)} className="p-1.5">
-                      <Trash2 size={13} color="var(--text-faint)" />
-                    </button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => {
+                          setShowAddBudget(false);
+                          setConfirmBudgetId(null);
+                          setEditingBudget(b);
+                          setBudgetCat(b.category);
+                          setBudgetAmount(String(b.amount));
+                        }}
+                        aria-label="Ubah anggaran"
+                        className="p-1.5"
+                      >
+                        <Pencil size={13} color="var(--blue)" />
+                      </button>
+                      <button onClick={() => setConfirmBudgetId(b.id)} className="p-1.5">
+                        <Trash2 size={13} color="var(--text-faint)" />
+                      </button>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <button
