@@ -94,5 +94,5 @@ export function getCatMeta(categories: Category[], type: TxType, catId: string):
   const list = categories.filter((c) => c.type === type);
   const found = list.find((c) => c.label.toLowerCase() === String(catId).toLowerCase());
   if (found) return { ...found, icon: ICON_MAP[found.icon] || MoreHorizontal };
-  return { id: "", label: catId, icon: MoreHorizontal, color: "var(--text-muted)", isDefault: false, type };
+  return { id: "", label: catId, icon: MoreHorizontal, color: "var(--text-muted)", isDefault: false, type, familyId: null };
 }

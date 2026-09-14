@@ -3,6 +3,10 @@ import type {
   BudgetDraft,
   Category,
   CategoryDraft,
+  Family,
+  FamilyMember,
+  FamilyState,
+  FamilyRole,
   Member,
   Mode,
   Transaction,
@@ -20,6 +24,7 @@ interface TxRow {
   note: string | null;
   date: string;
   member_id: string | null;
+  family_id: string | null;
   created_at: string;
 }
 
@@ -33,6 +38,7 @@ function rowToTx(row: TxRow): Transaction {
     note: row.note || "",
     date: row.date,
     memberId: row.member_id,
+    familyId: row.family_id,
     createdAt: new Date(row.created_at).getTime(),
   };
 }
@@ -42,10 +48,11 @@ interface MemberRow {
   name: string;
   color: string;
   built_in: boolean;
+  family_id: string | null;
 }
 
 function rowToMember(row: MemberRow): Member {
-  return { id: row.id, name: row.name, color: row.color, builtIn: row.built_in };
+  return { id: row.id, name: row.name, color: row.color, builtIn: row.built_in, familyId: row.family_id };
 }
 
 interface BudgetRow {
@@ -53,10 +60,11 @@ interface BudgetRow {
   mode: Mode;
   category: string;
   amount: number | string;
+  family_id: string | null;
 }
 
 function rowToBudget(row: BudgetRow): Budget {
-  return { id: row.id, mode: row.mode, category: row.category, amount: Number(row.amount) };
+  return { id: row.id, mode: row.mode, category: row.category, amount: Number(row.amount), familyId: row.family_id };
 }
 
 interface CategoryRow {
@@ -66,6 +74,7 @@ interface CategoryRow {
   icon: string;
   color: string;
   is_default: boolean;
+  family_id: string | null;
 }
 
 function rowToCategory(row: CategoryRow): Category {
@@ -76,25 +85,108 @@ function rowToCategory(row: CategoryRow): Category {
     icon: row.icon,
     color: row.color,
     isDefault: row.is_default,
+    familyId: row.family_id,
   };
 }
 
-export async function fetchTransactions(userId: string): Promise<Transaction[]> {
+interface FamilyMemberRow {
+  id: string;
+  family_id: string;
+  user_id: string;
+  role: FamilyRole;
+  email: string | null;
+  created_at: string;
+}
+
+function rowToFamilyMember(row: FamilyMemberRow): FamilyMember {
+  return {
+    id: row.id,
+    familyId: row.family_id,
+    userId: row.user_id,
+    role: row.role,
+    email: row.email,
+    createdAt: new Date(row.created_at).getTime(),
+  };
+}
+
+/* ================================ Keluarga ================================ */
+
+export async function fetchMyFamily(): Promise<FamilyState | null> {
+  const { data, error } = await supabase
+    .from("family_members")
+    .select("id, family_id, user_id, role, email, created_at");
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  const familyId = data[0].family_id;
+  const { data: fam, error: famErr } = await supabase
+    .from("families")
+    .select("id, name")
+    .eq("id", familyId)
+    .maybeSingle();
+  if (famErr) throw famErr;
+  if (!fam) return null;
+  const members = data.filter((r) => r.family_id === familyId).map(rowToFamilyMember);
+  return { family: fam, members };
+}
+
+export async function createFamily(): Promise<Family> {
+  const { data, error } = await supabase.rpc("create_family");
+  if (error) throw error;
+  return { id: data as string, name: "Keluarga" };
+}
+
+export async function fetchJoinCode(familyId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("get_join_code", { target_family_id: familyId });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function regenerateJoinCode(familyId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("regenerate_join_code", { target_family_id: familyId });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function joinFamilyByCode(code: string): Promise<string> {
+  const { data, error } = await supabase.rpc("join_family_by_code", { target_code: code });
+  if (error) throw error;
+  return data as string;
+}
+
+/** true = keluarga masih ada; false = keluarga (beserta datanya) dihapus. */
+export async function leaveFamily(): Promise<boolean> {
+  const { data, error } = await supabase.rpc("leave_family");
+  if (error) throw error;
+  return data !== null;
+}
+
+export async function removeFamilyMember(targetUserId: string): Promise<void> {
+  const { error } = await supabase.rpc("remove_family_member", { target_user_id: targetUserId });
+  if (error) throw error;
+}
+
+/* ================================ Transactions ================================ */
+
+export async function fetchTransactions(): Promise<Transaction[]> {
   const { data, error } = await supabase
     .from("transactions")
     .select("*")
-    .eq("user_id", userId)
     .order("date", { ascending: false })
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data || []).map(rowToTx);
 }
 
-export async function insertTransaction(userId: string, draft: TransactionDraft): Promise<Transaction> {
+export async function insertTransaction(
+  userId: string,
+  familyId: string | null,
+  draft: TransactionDraft
+): Promise<Transaction> {
   const { data, error } = await supabase
     .from("transactions")
     .insert({
       user_id: userId,
+      family_id: draft.mode === "keluarga" ? familyId : null,
       mode: draft.mode,
       type: draft.type,
       amount: draft.amount,
@@ -132,29 +224,44 @@ export async function updateTransaction(id: string, draft: Omit<TransactionDraft
   return rowToTx(data);
 }
 
-export async function deleteTransactionsByMode(userId: string, mode: Mode): Promise<void> {
-  const { error } = await supabase.from("transactions").delete().eq("user_id", userId).eq("mode", mode);
+export async function deleteTransactionsByMode(userId: string, familyId: string | null, mode: Mode): Promise<void> {
+  let query = supabase.from("transactions").delete();
+  if (mode === "keluarga" && familyId) {
+    query = query.eq("family_id", familyId);
+  } else {
+    query = query.eq("user_id", userId);
+  }
+  const { error } = await query.eq("mode", mode);
   if (error) throw error;
 }
 
-export async function fetchMembers(userId: string): Promise<Member[]> {
+/* ================================ Members ================================ */
+
+export async function fetchMembers(userId: string, familyId: string | null): Promise<Member[]> {
+  if (!familyId) return [];
   const { data, error } = await supabase
     .from("members")
     .select("*")
-    .eq("user_id", userId)
+    .eq("family_id", familyId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   if (!data || data.length === 0) {
-    const created = await insertMember(userId, "Bersama", "#4FB0A5", true);
+    const created = await insertMember(userId, familyId, "Bersama", "#4FB0A5", true);
     return [created];
   }
   return data.map(rowToMember);
 }
 
-export async function insertMember(userId: string, name: string, color: string, builtIn = false): Promise<Member> {
+export async function insertMember(
+  userId: string,
+  familyId: string | null,
+  name: string,
+  color: string,
+  builtIn = false
+): Promise<Member> {
   const { data, error } = await supabase
     .from("members")
-    .insert({ user_id: userId, name, color, built_in: builtIn })
+    .insert({ user_id: userId, family_id: familyId, name, color, built_in: builtIn })
     .select()
     .single();
   if (error) throw error;
@@ -166,17 +273,57 @@ export async function deleteMemberById(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function fetchBudgets(userId: string): Promise<Budget[]> {
+/* ================================ Budgets ================================ */
+
+export async function fetchBudgets(): Promise<Budget[]> {
   const { data, error } = await supabase
     .from("budgets")
     .select("*")
-    .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data || []).map(rowToBudget);
 }
 
-export async function upsertBudget(userId: string, draft: BudgetDraft): Promise<Budget> {
+export async function upsertBudget(
+  userId: string,
+  familyId: string | null,
+  draft: BudgetDraft
+): Promise<Budget> {
+  if (draft.mode === "keluarga") {
+    if (!familyId) throw new Error("Tidak ada keluarga aktif.");
+    const { data: existing, error: exErr } = await supabase
+      .from("budgets")
+      .select("id")
+      .eq("family_id", familyId)
+      .eq("mode", "keluarga")
+      .eq("category", draft.category)
+      .maybeSingle();
+    if (exErr) throw exErr;
+    if (existing?.id) {
+      const { data, error } = await supabase
+        .from("budgets")
+        .update({ amount: draft.amount })
+        .eq("id", existing.id)
+        .select()
+        .single();
+      if (error) throw error;
+      return rowToBudget(data);
+    }
+    const { data, error } = await supabase
+      .from("budgets")
+      .insert({
+        user_id: userId,
+        family_id: familyId,
+        mode: draft.mode,
+        category: draft.category,
+        amount: draft.amount,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToBudget(data);
+  }
+
   const { data, error } = await supabase
     .from("budgets")
     .upsert(
@@ -213,15 +360,28 @@ const DEFAULT_CATEGORIES: CategoryDraft[] = [
   { type: "in", label: "Lainnya", icon: "MoreHorizontal", color: "var(--text-muted)" },
 ];
 
-export async function fetchCategories(userId: string): Promise<Category[]> {
+function dedupeCategories(rows: Category[]): Category[] {
+  const map = new Map<string, Category>();
+  for (const c of rows) {
+    const key = c.type + "|" + c.label.toLowerCase();
+    const prev = map.get(key);
+    if (!prev) map.set(key, c);
+    else if (c.familyId && !prev.familyId) map.set(key, c);
+  }
+  return Array.from(map.values());
+}
+
+export async function fetchCategories(): Promise<Category[]> {
   const { data, error } = await supabase
     .from("categories")
     .select("*")
-    .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (error) throw error;
-  const rows = data || [];
+  const rows = (data || []).map(rowToCategory);
   if (rows.length === 0) {
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
+    if (!userId) return [];
     const { error: seedError } = await supabase.from("categories").upsert(
       DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId, is_default: true })),
       { onConflict: "user_id,type,label", ignoreDuplicates: true }
@@ -233,22 +393,53 @@ export async function fetchCategories(userId: string): Promise<Category[]> {
       .eq("user_id", userId)
       .order("created_at", { ascending: true });
     if (fetchError) throw fetchError;
-    return (seeded || []).map(rowToCategory);
+    return dedupeCategories((seeded || []).map(rowToCategory));
   }
-  return rows.map(rowToCategory);
+  return dedupeCategories(rows);
 }
 
-export async function insertCategory(userId: string, draft: CategoryDraft): Promise<Category> {
+export async function insertCategory(
+  userId: string,
+  familyId: string | null,
+  draft: CategoryDraft,
+  existing: Category[]
+): Promise<Category> {
+  const type = draft.type;
+  const label = draft.label.trim();
+  const icon = draft.icon || "MoreHorizontal";
+  const color = draft.color || "var(--text-muted)";
+  const byLabel = (c: Category) => c.type === type && c.label.toLowerCase() === label.toLowerCase();
+
+  if (familyId) {
+    const shared = existing.find((c) => byLabel(c) && c.familyId === familyId);
+    if (shared) return shared;
+    const personal = existing.find((c) => byLabel(c) && c.familyId === null);
+    if (personal) return promoteCategoryToFamily(personal.id, familyId);
+    const { data, error } = await supabase
+      .from("categories")
+      .insert({ user_id: userId, family_id: familyId, type, label, icon, color, is_default: false })
+      .select()
+      .single();
+    if (error) throw error;
+    return rowToCategory(data);
+  }
+
+  const personal = existing.find((c) => byLabel(c) && c.familyId === null);
+  if (personal) return personal;
   const { data, error } = await supabase
     .from("categories")
-    .insert({
-      user_id: userId,
-      type: draft.type,
-      label: draft.label,
-      icon: draft.icon || "MoreHorizontal",
-      color: draft.color || "var(--text-muted)",
-      is_default: false,
-    })
+    .insert({ user_id: userId, family_id: null, type, label, icon, color, is_default: false })
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToCategory(data);
+}
+
+export async function promoteCategoryToFamily(id: string, familyId: string): Promise<Category> {
+  const { data, error } = await supabase
+    .from("categories")
+    .update({ family_id: familyId })
+    .eq("id", id)
     .select()
     .single();
   if (error) throw error;

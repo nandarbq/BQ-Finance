@@ -1,6 +1,26 @@
 export type Mode = "pribadi" | "keluarga";
 export type TxType = "in" | "out";
 export type TabId = "beranda" | "transaksi" | "grafik" | "pengaturan";
+export type FamilyRole = "kepala_keluarga" | "member";
+
+export interface Family {
+  id: string;
+  name: string;
+}
+
+export interface FamilyMember {
+  id: string;
+  familyId: string;
+  userId: string;
+  role: FamilyRole;
+  email: string | null;
+  createdAt: number;
+}
+
+export interface FamilyState {
+  family: Family;
+  members: FamilyMember[];
+}
 
 export interface Transaction {
   id: string;
@@ -11,6 +31,7 @@ export interface Transaction {
   note: string;
   date: string;
   memberId: string | null;
+  familyId: string | null;
   createdAt: number;
 }
 
@@ -22,6 +43,7 @@ export interface TransactionDraft {
   note?: string;
   date: string;
   memberId?: string | null;
+  familyId?: string | null;
 }
 
 export interface Member {
@@ -29,6 +51,7 @@ export interface Member {
   name: string;
   color: string;
   builtIn: boolean;
+  familyId: string | null;
 }
 
 export interface Budget {
@@ -36,6 +59,7 @@ export interface Budget {
   mode: Mode;
   category: string;
   amount: number;
+  familyId: string | null;
 }
 
 export interface BudgetDraft {
@@ -51,6 +75,7 @@ export interface Category {
   icon: string;
   color: string;
   isDefault: boolean;
+  familyId: string | null;
 }
 
 export interface CategoryDraft {

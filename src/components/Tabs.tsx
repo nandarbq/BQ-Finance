@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { Mode, Transaction, Member, Budget, Category, TabId } from "../lib/types";
+import type { FamilyState, Mode, Transaction, Member, Budget, Category, TabId } from "../lib/types";
 import {
   Wallet,
   ArrowUpRight,
@@ -24,6 +24,12 @@ import {
   Moon,
   Sun,
   MoreHorizontal,
+  Users,
+  Copy,
+  RefreshCw,
+  KeyRound,
+  DoorOpen,
+  Crown,
 } from "lucide-react";
 import { toast } from "./Toast";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
@@ -42,6 +48,7 @@ import {
   budgetColor,
   useCountUp,
   useDebouncedValue,
+  nameFromEmail,
 } from "../lib/appUtils";
 import { getCatMeta, ICON_MAP, MEMBER_COLORS } from "../lib/categoryMeta";
 import { Avatar, EmptyState } from "./ui";
@@ -55,9 +62,19 @@ interface TabBerandaProps {
   setActiveTab: Dispatch<SetStateAction<TabId>>;
   openQuickAdd: () => void;
   categories: Category[];
+  hasFamily: boolean;
 }
 
-function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuickAdd, categories }: TabBerandaProps) {
+function TabBeranda({
+  mode,
+  modeTx,
+  modeBudgets,
+  members,
+  setActiveTab,
+  openQuickAdd,
+  categories,
+  hasFamily,
+}: TabBerandaProps) {
   const curKey = monthKeyFor(0);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
   const totalIncome = useMemo(() => modeTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [modeTx]);
@@ -95,6 +112,32 @@ function TabBeranda({ mode, modeTx, modeBudgets, members, setActiveTab, openQuic
 
   return (
     <div className="px-4 pt-1 pb-4">
+      {mode === "keluarga" && !hasFamily && (
+        <div
+          className="flex items-center justify-between gap-2 rounded-2xl px-4 py-3 mb-4"
+          style={{ background: "var(--bg-surface)", border: "1px solid var(--border)" }}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div
+              className="flex items-center justify-center flex-shrink-0"
+              style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(0,171,107,0.14)" }}
+            >
+              <Users size={15} color="var(--blue)" />
+            </div>
+            <div className="min-w-0">
+              <p style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>Keluarga belum aktif</p>
+              <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Buat keluarga atau gabung dengan kode undangan.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab("pengaturan")}
+            className="px-3 py-1.5 rounded-full flex-shrink-0"
+            style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 10.5, fontWeight: 700 }}
+          >
+            Atur
+          </button>
+        </div>
+      )}
       <div
         className="relative overflow-hidden rounded-3xl px-5 pt-5 pb-6 mb-4"
         style={{ background: "linear-gradient(160deg,var(--blue-soft) 0%,var(--bg-app) 60%,var(--bg-app) 100%)" }}
@@ -1009,12 +1052,20 @@ interface TabPengaturanProps {
   onClearData: () => void | Promise<void>;
   modeTx: Transaction[];
   userEmail: string;
+  userId: string;
   onSignOut: () => void | Promise<void>;
   theme: "light" | "dark";
   onToggleTheme: () => void;
   displayName: string;
   onNameChange: (name: string) => void;
   categories: Category[];
+  family: FamilyState | null;
+  joinCode: string | null;
+  onCreateFamily: () => void | Promise<boolean>;
+  onJoinFamily: (code: string) => void | Promise<boolean>;
+  onRegenerateCode: () => void | Promise<void>;
+  onLeaveFamily: () => void | Promise<void>;
+  onRemoveMember: (userId: string) => void | Promise<void>;
 }
 
 function TabPengaturan({
@@ -1028,12 +1079,20 @@ function TabPengaturan({
   onClearData,
   modeTx,
   userEmail,
+  userId,
   onSignOut,
   theme,
   onToggleTheme,
   displayName,
   onNameChange,
   categories,
+  family,
+  joinCode,
+  onCreateFamily,
+  onJoinFamily,
+  onRegenerateCode,
+  onLeaveFamily,
+  onRemoveMember,
 }: TabPengaturanProps) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
@@ -1047,6 +1106,10 @@ function TabPengaturan({
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [confirmBudgetId, setConfirmBudgetId] = useState<string | null>(null);
   const [confirmMemberId, setConfirmMemberId] = useState<string | null>(null);
+  const [joinInput, setJoinInput] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [confirmRemoveUser, setConfirmRemoveUser] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const memberTotals = useMemo(
     () =>
@@ -1056,6 +1119,23 @@ function TabPengaturan({
       }),
     [members, modeTx]
   );
+
+  const isKepala = !!family?.members.find((m) => m.userId === userId && m.role === "kepala_keluarga");
+
+  function formatJoinCode(code: string | null): string {
+    const c = (code || "").toUpperCase();
+    return c.length > 4 ? c.slice(0, 4) + "-" + c.slice(4) : c;
+  }
+
+  async function copyJoinCode(code: string | null) {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(formatJoinCode(code));
+      toast.success("Kode undangan disalin.");
+    } catch {
+      toast.error("Gagal menyalin kode.");
+    }
+  }
 
   return (
     <div className="px-4 pt-1 pb-4">
@@ -1147,6 +1227,245 @@ function TabPengaturan({
             : "Pencatatan keuangan pribadi. Ganti ke mode Keluarga lewat tombol di bagian atas beranda."}
         </p>
       </div>
+
+      {mode === "keluarga" && (
+        <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <Users size={14} color="var(--cat-teal)" />
+              <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Keluarga bersama</p>
+            </div>
+            {family && (
+              <span
+                className="px-2 py-0.5 rounded-full"
+                style={{
+                  background: "var(--bg-muted)",
+                  color: "var(--text-muted)",
+                  fontSize: 10,
+                  fontWeight: 600,
+                }}
+              >
+                {family.members.length} akun
+              </span>
+            )}
+          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: 11.5, marginTop: 3 }}>
+            {family
+              ? "Menu keluarga ini dikontrol bersama. Bagikan kode undangan agar pasanganmu ikut mencatat."
+              : "Kelola keuangan keluarga berdua. Satu menu, dua akun saling melihat dan mencatat."}
+          </p>
+
+          {!family ? (
+            <>
+              <button
+                onClick={() => {
+                  onCreateFamily();
+                }}
+                className="w-full mt-3 flex items-center justify-center gap-1.5 py-2.5 rounded-xl"
+                style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 12, fontWeight: 700 }}
+              >
+                <UserPlus size={13} />
+                Buat keluarga
+              </button>
+              <div className="flex items-center gap-2 mt-2">
+                <div
+                  className="flex-1 flex items-center gap-1.5 px-3 py-2 rounded-lg"
+                  style={{ background: "var(--bg-muted)" }}
+                >
+                  <KeyRound size={13} color="var(--text-muted)" />
+                  <input
+                    value={joinInput}
+                    onChange={(e) => setJoinInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                    placeholder="MASUKKAN KODE"
+                    maxLength={8}
+                    className="w-full outline-none bg-transparent uppercase"
+                    style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 700, letterSpacing: 1.5 }}
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!joinInput.trim() || joining) return;
+                    setJoining(true);
+                    await onJoinFamily(joinInput);
+                    setJoining(false);
+                    setJoinInput("");
+                  }}
+                  disabled={!joinInput.trim() || joining}
+                  className="px-4 py-2 rounded-lg flex-shrink-0"
+                  style={{
+                    background: !joinInput.trim() || joining ? "var(--bg-selected)" : "var(--cat-teal)",
+                    color: !joinInput.trim() || joining ? "var(--text-faint)" : "var(--bg-app)",
+                    fontSize: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  {joining ? "..." : "Gabung"}
+                </button>
+              </div>
+              <p style={{ color: "var(--text-faint)", fontSize: 10, marginTop: 8 }}>
+                Punya kode dari pasangan? Ketik kodenya di atas untuk bergabung.
+              </p>
+            </>
+          ) : (
+            <>
+              {isKepala && (
+                <div className="rounded-xl p-3 mt-3" style={{ background: "var(--bg-muted)" }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>Kode undangan</p>
+                    <button
+                      onClick={() => {
+                        onRegenerateCode();
+                      }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-full flex-shrink-0"
+                      style={{ background: "var(--bg-app)" }}
+                    >
+                      <RefreshCw size={10} color="var(--blue)" />
+                      <span style={{ color: "var(--blue)", fontSize: 10, fontWeight: 600 }}>Buat baru</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="flex-1 rounded-lg px-3 py-2 text-center"
+                      style={{ background: "var(--bg-app)", border: "1px dashed var(--text-faint)" }}
+                    >
+                      <span
+                        style={{
+                          fontFamily: "'Sora', sans-serif",
+                          color: "var(--text-primary)",
+                          fontSize: 16,
+                          fontWeight: 800,
+                          letterSpacing: 2,
+                        }}
+                      >
+                        {formatJoinCode(joinCode)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => copyJoinCode(joinCode)}
+                      className="flex items-center justify-center rounded-lg flex-shrink-0"
+                      style={{ width: 36, height: 36, background: "var(--bg-app)" }}
+                      aria-label="Salin kode undangan"
+                    >
+                      <Copy size={14} color="var(--blue)" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 mt-3">
+                {family.members.map((m) => {
+                  const isMe = m.userId === userId;
+                  const isKepalaRole = m.role === "kepala_keluarga";
+                  const nameToShow = isMe ? displayName : m.email ? nameFromEmail(m.email) : "Anggota";
+                  const confirmingRemove = confirmRemoveUser === m.userId;
+                  return (
+                    <div key={m.id} className="flex items-center gap-2.5">
+                      <Avatar name={nameToShow} color="var(--cat-teal)" size={30} />
+                      <div className="flex-1 min-w-0">
+                        <p className="truncate" style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }}>
+                          {nameToShow}
+                          {isMe ? " (Kamu)" : ""}
+                        </p>
+                        <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>
+                          {isKepalaRole ? "Kepala keluarga" : "Anggota"}
+                        </p>
+                      </div>
+                      {isKepalaRole && <Crown size={13} color="#f5b50a" />}
+                      {isKepala && !isMe && !confirmingRemove && (
+                        <button
+                          onClick={() => setConfirmRemoveUser(m.userId)}
+                          className="p-1.5 rounded-lg"
+                          aria-label={"Hapus " + nameToShow + " dari keluarga"}
+                        >
+                          <Trash2 size={13} color="var(--text-faint)" />
+                        </button>
+                      )}
+                      {isKepala && !isMe && confirmingRemove && (
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              onRemoveMember(m.userId);
+                              setConfirmRemoveUser(null);
+                            }}
+                            className="px-2 py-1 rounded-lg"
+                            style={{
+                              background: "var(--negative)",
+                              color: "var(--bg-app)",
+                              fontSize: 10,
+                              fontWeight: 700,
+                            }}
+                          >
+                            Hapus
+                          </button>
+                          <button
+                            onClick={() => setConfirmRemoveUser(null)}
+                            className="px-2 py-1 rounded-lg"
+                            style={{
+                              background: "var(--bg-selected)",
+                              color: "var(--text-secondary)",
+                              fontSize: 10,
+                              fontWeight: 600,
+                            }}
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-3" style={{ borderTop: "1px solid var(--border)" }}>
+                {!confirmLeave ? (
+                  <button
+                    onClick={() => setConfirmLeave(true)}
+                    className="w-full mt-3 flex items-center justify-center gap-1.5 py-2 rounded-xl"
+                    style={{ background: "var(--bg-muted)", color: "var(--negative)", fontSize: 11.5, fontWeight: 600 }}
+                  >
+                    <DoorOpen size={13} />
+                    Keluar dari keluarga
+                  </button>
+                ) : (
+                  <div className="mt-3">
+                    <p style={{ color: "var(--text-muted)", fontSize: 10.5, marginBottom: 8 }}>
+                      {isKepala && family.members.length > 1
+                        ? "Kepemimpinan keluarga akan berpindah ke anggota lain."
+                        : isKepala
+                          ? "Kamu masih satu-satunya anggota. Keluar berarti menghapus keluarga beserta seluruh datanya."
+                          : "Kamu akan berhenti melihat dan mengontrol menu keluarga ini."}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          onLeaveFamily();
+                          setConfirmLeave(false);
+                        }}
+                        className="flex-1 py-2 rounded-xl"
+                        style={{ background: "var(--negative)", color: "var(--bg-app)", fontSize: 12, fontWeight: 700 }}
+                      >
+                        Ya, keluar
+                      </button>
+                      <button
+                        onClick={() => setConfirmLeave(false)}
+                        className="flex-1 py-2 rounded-xl"
+                        style={{
+                          background: "var(--bg-selected)",
+                          color: "var(--text-secondary)",
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
         <div className="flex items-center justify-between mb-1">
@@ -1443,7 +1762,7 @@ function TabPengaturan({
         </button>
       </div>
 
-      {mode === "keluarga" && (
+      {mode === "keluarga" && family && (
         <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
           <div className="flex items-center justify-between mb-2">
             <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Anggota keluarga</p>

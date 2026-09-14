@@ -21,9 +21,26 @@ import {
   insertCategory,
   updateCategory,
   deleteCategory,
+  fetchMyFamily,
+  createFamily,
+  fetchJoinCode,
+  regenerateJoinCode,
+  joinFamilyByCode,
+  leaveFamily,
+  removeFamilyMember,
 } from "../lib/financeApi";
 import { nameFromEmail } from "../lib/appUtils";
-import type { Budget, Category, CategoryDraft, Member, Mode, TabId, Transaction, TransactionDraft } from "../lib/types";
+import type {
+  Budget,
+  Category,
+  CategoryDraft,
+  FamilyState,
+  Member,
+  Mode,
+  TabId,
+  Transaction,
+  TransactionDraft,
+} from "../lib/types";
 import { ProfileAvatar, LoadingSkeleton } from "./ui";
 import { CropSheet, ProfileSheet, TxDetailSheet, OnboardingSheet } from "./Sheets";
 import { QuickAddSheet } from "./QuickAddSheet";
@@ -36,6 +53,23 @@ interface BeforeInstallPromptEventShim extends Event {
 
 interface BqFinanceAppProps {
   session: Session;
+}
+
+function errMsg(e: unknown): string {
+  const m = (e as { message?: string })?.message || "";
+  const clean = m.replace(/^Database error saving new session[: ]*/i, "").trim();
+  return clean || "Terjadi kesalahan. Coba lagi.";
+}
+
+function dedupeCategoriesWith(rows: Category[]): Category[] {
+  const map = new Map<string, Category>();
+  for (const c of rows) {
+    const key = c.type + "|" + c.label.toLowerCase();
+    const prev = map.get(key);
+    if (!prev) map.set(key, c);
+    else if (c.familyId && !prev.familyId) map.set(key, c);
+  }
+  return Array.from(map.values());
 }
 
 export default function BqFinanceApp({ session }: BqFinanceAppProps) {
@@ -54,6 +88,8 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [family, setFamily] = useState<FamilyState | null>(null);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("beranda");
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -84,12 +120,23 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
 
   const loadData = useCallback(async () => {
     try {
+      const fam = await fetchMyFamily();
+      let code: string | null = null;
+      if (fam) {
+        try {
+          code = await fetchJoinCode(fam.family.id);
+        } catch (e) {
+          console.error(e);
+        }
+      }
       const [tx, mem, bdgt, cats] = await Promise.all([
-        fetchTransactions(userId),
-        fetchMembers(userId),
-        fetchBudgets(userId),
-        fetchCategories(userId),
+        fetchTransactions(),
+        fetchMembers(userId, fam ? fam.family.id : null),
+        fetchBudgets(),
+        fetchCategories(),
       ]);
+      setFamily(fam);
+      setJoinCode(code);
       setTransactions(tx);
       setMembers(mem);
       setBudgets(bdgt);
@@ -195,13 +242,17 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
 
   const handleSaveTransaction = useCallback(
     async (draft: TransactionDraft) => {
+      if (draft.mode === "keluarga" && !family) {
+        toast.error("Buat atau gabung keluarga dulu lewat menu Pengaturan.");
+        return;
+      }
       setSaving(true);
       try {
         if (editingTx) {
           const updated = await updateTransaction(editingTx.id, draft);
           setTransactions((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
         } else {
-          const tx = await insertTransaction(userId, draft);
+          const tx = await insertTransaction(userId, family ? family.family.id : null, draft);
           setTransactions((prev) => [tx, ...prev]);
         }
         setQuickAddOpen(false);
@@ -213,7 +264,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
         setSaving(false);
       }
     },
-    [userId, editingTx]
+    [userId, editingTx, family]
   );
 
   const openQuickAdd = useCallback(() => {
@@ -251,7 +302,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
               label: "Urungkan",
               onClick: async () => {
                 try {
-                  const restored = await insertTransaction(userId, {
+                  const restored = await insertTransaction(userId, target.mode === "keluarga" ? target.familyId : null, {
                     mode: target.mode,
                     type: target.type,
                     amount: target.amount,
@@ -291,26 +342,26 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     const prev = transactions;
     setTransactions((p) => p.filter((t) => t.mode !== mode));
     try {
-      await deleteTransactionsByMode(userId, mode);
+      await deleteTransactionsByMode(userId, family ? family.family.id : null, mode);
     } catch (e) {
       console.error(e);
       setTransactions(prev);
       toast.error("Gagal menghapus data.");
     }
-  }, [transactions, mode, userId]);
+  }, [transactions, mode, userId, family]);
 
   const handleAddMember = useCallback(
     async (name: string, color: string) => {
       if (!name || !name.trim()) return;
       try {
-        const m = await insertMember(userId, name.trim(), color, false);
+        const m = await insertMember(userId, family ? family.family.id : null, name.trim(), color, false);
         setMembers((prev) => [...prev, m]);
       } catch (e) {
         console.error(e);
         toast.error("Gagal menambah anggota.");
       }
     },
-    [userId]
+    [userId, family]
   );
 
   const handleDeleteMember = useCallback(
@@ -332,7 +383,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     async (category: string, amount: number) => {
       if (!category || !amount || amount <= 0) return;
       try {
-        const b = await upsertBudget(userId, { mode, category, amount });
+        const b = await upsertBudget(userId, family ? family.family.id : null, { mode, category, amount });
         setBudgets((prev) => {
           const rest = prev.filter((x) => !(x.mode === mode && x.category === category));
           return [...rest, b];
@@ -342,7 +393,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
         toast.error("Gagal menyimpan anggaran.");
       }
     },
-    [userId, mode]
+    [userId, mode, family]
   );
 
   const handleDeleteBudget = useCallback(
@@ -364,15 +415,20 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     async (draft: CategoryDraft) => {
       if (!draft || !draft.label || !draft.label.trim()) return;
       try {
-        const cats = await insertCategory(userId, { ...draft, label: draft.label.trim() });
-        const next = [...categories, cats];
+        const cats = await insertCategory(
+          userId,
+          mode === "keluarga" ? (family ? family.family.id : null) : null,
+          { ...draft, label: draft.label.trim() },
+          categories
+        );
+        const next = dedupeCategoriesWith([...categories, cats]);
         setCategories(next);
       } catch (e) {
         console.error(e);
         toast.error("Gagal menambah kategori.");
       }
     },
-    [userId, categories]
+    [userId, categories, mode, family]
   );
 
   const handleUpdateCategory = useCallback(
@@ -409,6 +465,81 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       }
     },
     [categories]
+  );
+
+  const handleCreateFamily = useCallback(async () => {
+    try {
+      const fam = await createFamily();
+      await loadData();
+      const code = await fetchJoinCode(fam.id);
+      setJoinCode(code);
+      toast.success("Keluarga dibuat. Bagikan kode undangan ke pasanganmu.");
+      return true;
+    } catch (e) {
+      console.error(e);
+      toast.error(errMsg(e));
+      return false;
+    }
+  }, [loadData]);
+
+  const handleJoinFamily = useCallback(
+    async (code: string): Promise<boolean> => {
+      try {
+        const famId = await joinFamilyByCode(code.trim());
+        await loadData();
+        const c = await fetchJoinCode(famId);
+        setJoinCode(c);
+        toast.success("Berhasil bergabung ke keluarga!");
+        return true;
+      } catch (e) {
+        console.error(e);
+        toast.error(errMsg(e));
+        return false;
+      }
+    },
+    [loadData]
+  );
+
+  const handleRegenerateCode = useCallback(async () => {
+    if (!family) return;
+    try {
+      const code = await regenerateJoinCode(family.family.id);
+      setJoinCode(code);
+      toast.success("Kode undangan baru sudah dibuat.");
+    } catch (e) {
+      console.error(e);
+      toast.error(errMsg(e));
+    }
+  }, [family]);
+
+  const handleLeaveFamily = useCallback(async () => {
+    try {
+      const stillExists = await leaveFamily();
+      await loadData();
+      setJoinCode(null);
+      if (stillExists) {
+        toast.success("Kamu keluar dari keluarga.");
+      } else {
+        toast.success("Keluarga dihapus beserta seluruh datanya.");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error(errMsg(e));
+    }
+  }, [loadData]);
+
+  const handleRemoveFamilyMember = useCallback(
+    async (targetUserId: string) => {
+      try {
+        await removeFamilyMember(targetUserId);
+        await loadData();
+        toast.success("Anggota dihapus dari keluarga.");
+      } catch (e) {
+        console.error(e);
+        toast.error(errMsg(e));
+      }
+    },
+    [loadData]
   );
 
   function handleModeChange(m: Mode) {
@@ -630,6 +761,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   setActiveTab={setActiveTab}
                   openQuickAdd={openQuickAdd}
                   categories={categories}
+                  hasFamily={!!family}
                 />
               )}
               {activeTab === "transaksi" && (
@@ -657,12 +789,20 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   onDeleteBudget={handleDeleteBudget}
                   onClearData={handleClearData}
                   userEmail={userEmail}
+                  userId={userId}
                   onSignOut={handleSignOut}
                   theme={theme}
                   onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
                   displayName={displayName}
                   onNameChange={handleNameChange}
                   categories={categories}
+                  family={family}
+                  joinCode={joinCode}
+                  onCreateFamily={handleCreateFamily}
+                  onJoinFamily={handleJoinFamily}
+                  onRegenerateCode={handleRegenerateCode}
+                  onLeaveFamily={handleLeaveFamily}
+                  onRemoveMember={handleRemoveFamilyMember}
                 />
               )}
             </div>
@@ -701,7 +841,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
           })}
         </div>
 
-        {(activeTab === "beranda" || activeTab === "transaksi") && (
+        {(activeTab === "beranda" || activeTab === "transaksi") && !(mode === "keluarga" && !family) && (
           <button
             onClick={openQuickAdd}
             className="absolute flex items-center justify-center transition-transform active:scale-90"
