@@ -419,6 +419,7 @@ interface TabTransaksiProps {
   onEdit: (tx: Transaction) => void;
   onDetail: (tx: Transaction) => void;
   categories: Category[];
+  family: FamilyState | null;
 }
 
 function TabTransaksi({
@@ -430,6 +431,7 @@ function TabTransaksi({
   onEdit,
   onDetail,
   categories,
+  family,
 }: TabTransaksiProps) {
   const [filter, setFilter] = useState<"all" | "in" | "out">("all");
   const [period, setPeriod] = useState<"all" | "month" | "lastMonth" | "custom">("month");
@@ -704,6 +706,10 @@ function TabTransaksi({
                 const meta = getCatMeta(categories, t.type, t.category);
                 const Icon = meta.icon;
                 const member = members.find((m) => m.id === t.memberId);
+                const adder = family?.members.find((fm) => fm.userId === t.userId);
+                const adderName = adder
+                  ? adder.displayName || nameFromEmail(adder.email || "") || "Anggota"
+                  : null;
                 const isConfirm = confirmId === t.id;
                 return (
                   <div

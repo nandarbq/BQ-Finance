@@ -836,6 +836,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   members={members}
                   mode={mode}
                   displayName={displayName}
+                  family={family}
                   onDelete={handleDeleteTransaction}
                   onEdit={openQuickEdit}
                   onDetail={openTxDetail}
