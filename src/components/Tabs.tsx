@@ -1067,6 +1067,7 @@ interface TabPengaturanProps {
   onRegenerateCode: () => void | Promise<void>;
   onLeaveFamily: () => void | Promise<void>;
   onRemoveMember: (userId: string) => void | Promise<void>;
+  onRefreshFamily: () => void | Promise<void>;
 }
 
 function TabPengaturan({
@@ -1095,6 +1096,7 @@ function TabPengaturan({
   onRegenerateCode,
   onLeaveFamily,
   onRemoveMember,
+  onRefreshFamily,
 }: TabPengaturanProps) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
@@ -1108,10 +1110,11 @@ function TabPengaturan({
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [confirmBudgetId, setConfirmBudgetId] = useState<string | null>(null);
   const [confirmMemberId, setConfirmMemberId] = useState<string | null>(null);
+  const [confirmRemoveUser, setConfirmRemoveUser] = useState<string | null>(null);
   const [joinInput, setJoinInput] = useState("");
   const [joining, setJoining] = useState(false);
-  const [confirmRemoveUser, setConfirmRemoveUser] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [familyRefreshing, setFamilyRefreshing] = useState(false);
 
   const memberTotals = useMemo(
     () =>
@@ -1238,17 +1241,34 @@ function TabPengaturan({
               <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Keluarga bersama</p>
             </div>
             {family && (
-              <span
-                className="px-2 py-0.5 rounded-full"
-                style={{
-                  background: "var(--bg-muted)",
-                  color: "var(--text-muted)",
-                  fontSize: 10,
-                  fontWeight: 600,
-                }}
-              >
-                {family.members.length} akun
-              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={async () => {
+                    setFamilyRefreshing(true);
+                    try {
+                      await onRefreshFamily();
+                    } finally {
+                      setFamilyRefreshing(false);
+                    }
+                  }}
+                  className="flex items-center justify-center rounded-lg flex-shrink-0"
+                  style={{ width: 26, height: 26, background: "var(--bg-muted)" }}
+                  aria-label="Segarkan data keluarga"
+                >
+                  <RefreshCw size={12} color="var(--text-muted)" style={familyRefreshing ? { animation: "spin 1s linear infinite" } : undefined} />
+                </button>
+                <span
+                  className="px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "var(--bg-muted)",
+                    color: "var(--text-muted)",
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >
+                  {family.members.length} akun
+                </span>
+              </div>
             )}
           </div>
           <p style={{ color: "var(--text-muted)", fontSize: 11.5, marginTop: 3 }}>

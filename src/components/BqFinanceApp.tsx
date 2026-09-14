@@ -169,6 +169,41 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     setRefreshing(false);
   }, [loadData]);
 
+  const refreshFamily = useCallback(async () => {
+    try {
+      const fam = await fetchMyFamily();
+      let code: string | null = null;
+      if (fam) {
+        try {
+          code = await fetchJoinCode(fam.family.id);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      setFamily(fam);
+      setJoinCode(code);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const familyRefreshBusy = useRef(false);
+  useEffect(() => {
+    if (activeTab !== "pengaturan") return;
+    const doRefresh = async () => {
+      if (familyRefreshBusy.current) return;
+      familyRefreshBusy.current = true;
+      try {
+        await refreshFamily();
+      } finally {
+        familyRefreshBusy.current = false;
+      }
+    };
+    doRefresh();
+    const id = setInterval(doRefresh, 5000);
+    return () => clearInterval(id);
+  }, [activeTab, refreshFamily]);
+
   const onPullStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
     if (!el || el.scrollTop > 0) return;
@@ -817,8 +852,9 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   onCreateFamily={handleCreateFamily}
                   onJoinFamily={handleJoinFamily}
                   onRegenerateCode={handleRegenerateCode}
-                  onLeaveFamily={handleLeaveFamily}
+onLeaveFamily={handleLeaveFamily}
                   onRemoveMember={handleRemoveFamilyMember}
+                  onRefreshFamily={refreshFamily}
                 />
               )}
             </div>
