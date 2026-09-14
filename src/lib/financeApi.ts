@@ -127,7 +127,15 @@ export async function fetchMyFamily(): Promise<FamilyState | null> {
     .maybeSingle();
   if (famErr) throw famErr;
   if (!fam) return null;
-  const members = data.filter((r) => r.family_id === familyId).map(rowToFamilyMember);
+  const members = data
+    .filter((r) => r.family_id === familyId)
+    .map(rowToFamilyMember)
+    .sort((a, b) => {
+      const ak = a.role === "kepala_keluarga" ? 0 : 1;
+      const bk = b.role === "kepala_keluarga" ? 0 : 1;
+      if (ak !== bk) return ak - bk;
+      return a.createdAt - b.createdAt;
+    });
   return { family: fam, members };
 }
 
