@@ -51,7 +51,7 @@ import {
   nameFromEmail,
 } from "../lib/appUtils";
 import { getCatMeta, ICON_MAP, MEMBER_COLORS } from "../lib/categoryMeta";
-import { Avatar, EmptyState } from "./ui";
+import { Avatar, EmptyState, ProfileAvatar } from "./ui";
 import { CalendarSheet } from "./Sheets";
 
 interface TabBerandaProps {
@@ -1057,6 +1057,7 @@ interface TabPengaturanProps {
   theme: "light" | "dark";
   onToggleTheme: () => void;
   displayName: string;
+  avatar: string | null;
   onNameChange: (name: string) => void;
   categories: Category[];
   family: FamilyState | null;
@@ -1084,6 +1085,7 @@ function TabPengaturan({
   theme,
   onToggleTheme,
   displayName,
+  avatar,
   onNameChange,
   categories,
   family,
@@ -1358,9 +1360,10 @@ function TabPengaturan({
                   const isKepalaRole = m.role === "kepala_keluarga";
                   const nameToShow = isMe ? displayName : m.email ? nameFromEmail(m.email) : "Anggota";
                   const confirmingRemove = confirmRemoveUser === m.userId;
+                  const memberAvatar = isMe ? avatar || m.avatarUrl : m.avatarUrl;
                   return (
                     <div key={m.id} className="flex items-center gap-2.5">
-                      <Avatar name={nameToShow} color="var(--cat-teal)" size={30} />
+                      <ProfileAvatar avatar={memberAvatar} size={30} innerId={"fm-" + m.userId} />
                       <div className="flex-1 min-w-0">
                         <p className="truncate" style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }}>
                           {nameToShow}

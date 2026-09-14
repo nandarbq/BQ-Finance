@@ -28,6 +28,7 @@ import {
   joinFamilyByCode,
   leaveFamily,
   removeFamilyMember,
+  updateMyFamilyAvatar,
 } from "../lib/financeApi";
 import { nameFromEmail } from "../lib/appUtils";
 import type {
@@ -581,12 +582,26 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   function handleCropConfirm(dataUrl: string) {
     setAvatar(dataUrl);
     localStorage.setItem("bqfinance_avatar_" + userId, dataUrl);
+    syncFamilyAvatar(dataUrl);
+    updateMyFamilyAvatar(dataUrl).catch((e) => console.error("sync family avatar:", e));
     setCropSrc(null);
   }
 
   function handleRemoveAvatar() {
     setAvatar(null);
     localStorage.removeItem("bqfinance_avatar_" + userId);
+    syncFamilyAvatar(null);
+    updateMyFamilyAvatar(null).catch((e) => console.error("sync family avatar:", e));
+  }
+
+  function syncFamilyAvatar(avatarUrl: string | null) {
+    setFamily((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        members: prev.members.map((fm) => (fm.userId === userId ? { ...fm, avatarUrl } : fm)),
+      };
+    });
   }
 
   function dismissOnboarding() {
@@ -794,6 +809,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   theme={theme}
                   onToggleTheme={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
                   displayName={displayName}
+                  avatar={avatar}
                   onNameChange={handleNameChange}
                   categories={categories}
                   family={family}

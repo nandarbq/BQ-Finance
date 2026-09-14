@@ -19,6 +19,7 @@ create table if not exists family_members (
   user_id uuid not null references auth.users (id) on delete cascade,
   role text not null check (role in ('kepala_keluarga', 'member')) default 'member',
   email text,
+  avatar_url text,
   created_at timestamptz not null default now(),
   unique (family_id, user_id)
 );
@@ -114,6 +115,7 @@ alter table members add column if not exists family_id uuid references families 
 alter table transactions add column if not exists family_id uuid references families (id) on delete cascade;
 alter table budgets add column if not exists family_id uuid references families (id) on delete cascade;
 alter table categories add column if not exists family_id uuid references families (id) on delete cascade;
+alter table family_members add column if not exists avatar_url text;
 
 create index if not exists idx_transactions_user_mode on transactions (user_id, mode);
 create index if not exists idx_transactions_user_date on transactions (user_id, date desc);
@@ -514,5 +516,21 @@ begin
     raise exception 'Gunakan "Keluar dari keluarga" untuk diri sendiri.';
   end if;
   delete from family_members where family_id = fid and user_id = target_user_id;
+end;
+$$;
+
+-- Simpan URL foto profil ke baris family_members milik user (no-op bila belum gabung keluarga).
+-- Dipakai agar foto profil terlihat oleh anggota keluarga lain.
+create or replace function update_my_family_avatar(target_avatar_url text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Unauthenticated';
+  end if;
+  update family_members set avatar_url = target_avatar_url where user_id = auth.uid();
 end;
 $$;

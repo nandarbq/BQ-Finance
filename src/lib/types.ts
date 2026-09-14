@@ -14,6 +14,7 @@ export interface FamilyMember {
   userId: string;
   role: FamilyRole;
   email: string | null;
+  avatarUrl: string | null;
   createdAt: number;
 }
 

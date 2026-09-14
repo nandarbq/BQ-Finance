@@ -58,6 +58,7 @@ import {
   joinFamilyByCode,
   leaveFamily,
   removeFamilyMember,
+  updateMyFamilyAvatar,
 } from "./financeApi";
 
 function setupChain(fetchResult, singleResult = fetchResult, maybeSingleResult = fetchResult) {
@@ -93,6 +94,7 @@ describe("financeApi - keluarga", () => {
     user_id: "u1",
     role: "kepala_keluarga",
     email: "a@mail.com",
+    avatar_url: null,
     created_at: "2026-09-01T00:00:00.000Z",
   };
 
@@ -120,6 +122,7 @@ describe("financeApi - keluarga", () => {
         userId: "u1",
         role: "kepala_keluarga",
         email: "a@mail.com",
+        avatarUrl: null,
         createdAt: new Date("2026-09-01T00:00:00.000Z").getTime(),
       },
     ]);
@@ -168,6 +171,14 @@ describe("financeApi - keluarga", () => {
     setupChain({ data: null, error: null });
     await removeFamilyMember("u2");
     expect(supabase.rpc).toHaveBeenCalledWith("remove_family_member", { target_user_id: "u2" });
+  });
+
+  it("updateMyFamilyAvatar calls update_my_family_avatar rpc", async () => {
+    setupChain({ data: null, error: null });
+    await updateMyFamilyAvatar("data:image/png;base64,xxx");
+    expect(supabase.rpc).toHaveBeenCalledWith("update_my_family_avatar", {
+      target_avatar_url: "data:image/png;base64,xxx",
+    });
   });
 });
 

@@ -496,22 +496,25 @@ function QuickAddSheet({
 
         {mode === "keluarga" && (
           <>
-            <p style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 600 }} className="mb-2">
+            <p style={{ color: "var(--text-muted)", fontSize: 11, fontWeight: 600 }} className="mb-1.5">
               Anggota
             </p>
-            <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
+            <div className="flex items-start gap-2.5 mb-4 overflow-x-auto px-1 pt-1 pb-2 -mx-1">
               {members.map((m) => (
                 <button
                   key={m.id}
                   onClick={() => setMemberId(m.id)}
-                  className="flex flex-col items-center gap-1 flex-shrink-0"
+                  className="flex flex-col items-center gap-1.5 flex-shrink-0"
                 >
                   <Avatar name={m.name} color={m.color} size={34} ring={memberId === m.id} />
                   <span
+                    className="truncate"
                     style={{
+                      maxWidth: 76,
                       color: memberId === m.id ? "var(--text-primary)" : "var(--text-muted)",
                       fontSize: 9.5,
                       fontWeight: 600,
+                      lineHeight: 1.2,
                     }}
                   >
                     {m.name}

@@ -95,6 +95,7 @@ interface FamilyMemberRow {
   user_id: string;
   role: FamilyRole;
   email: string | null;
+  avatar_url: string | null;
   created_at: string;
 }
 
@@ -105,6 +106,7 @@ function rowToFamilyMember(row: FamilyMemberRow): FamilyMember {
     userId: row.user_id,
     role: row.role,
     email: row.email,
+    avatarUrl: row.avatar_url,
     createdAt: new Date(row.created_at).getTime(),
   };
 }
@@ -114,7 +116,7 @@ function rowToFamilyMember(row: FamilyMemberRow): FamilyMember {
 export async function fetchMyFamily(): Promise<FamilyState | null> {
   const { data, error } = await supabase
     .from("family_members")
-    .select("id, family_id, user_id, role, email, created_at");
+    .select("id, family_id, user_id, role, email, avatar_url, created_at");
   if (error) throw error;
   if (!data || data.length === 0) return null;
   const familyId = data[0].family_id;
@@ -162,6 +164,11 @@ export async function leaveFamily(): Promise<boolean> {
 
 export async function removeFamilyMember(targetUserId: string): Promise<void> {
   const { error } = await supabase.rpc("remove_family_member", { target_user_id: targetUserId });
+  if (error) throw error;
+}
+
+export async function updateMyFamilyAvatar(avatarUrl: string | null): Promise<void> {
+  const { error } = await supabase.rpc("update_my_family_avatar", { target_avatar_url: avatarUrl });
   if (error) throw error;
 }
 
