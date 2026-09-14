@@ -29,6 +29,7 @@ import {
   leaveFamily,
   removeFamilyMember,
   updateMyFamilyAvatar,
+  updateMyFamilyName,
 } from "../lib/financeApi";
 import { nameFromEmail } from "../lib/appUtils";
 import type {
@@ -649,6 +650,21 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     const final = clean || nameFromEmail(userEmail);
     setDisplayName(final);
     localStorage.setItem("bqfinance_name_" + userId, final);
+    if (family) {
+      updateMyFamilyName(final)
+        .then(() => syncMyFamilyName(final))
+        .catch((e) => console.error("sync family name:", e));
+    }
+  }
+
+  function syncMyFamilyName(name: string) {
+    setFamily((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        members: prev.members.map((fm) => (fm.userId === userId ? { ...fm, displayName: name } : fm)),
+      };
+    });
   }
 
   return (

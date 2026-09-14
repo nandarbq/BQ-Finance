@@ -15,6 +15,7 @@ export interface FamilyMember {
   role: FamilyRole;
   email: string | null;
   avatarUrl: string | null;
+  displayName: string | null;
   createdAt: number;
 }
 
@@ -33,6 +34,8 @@ export interface Transaction {
   date: string;
   memberId: string | null;
   familyId: string | null;
+  /** ID akun pengguna yang menambahkan transaksi ini (pembuat). */
+  userId: string | null;
   createdAt: number;
 }
 

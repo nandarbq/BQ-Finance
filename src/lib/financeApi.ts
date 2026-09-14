@@ -25,6 +25,7 @@ interface TxRow {
   date: string;
   member_id: string | null;
   family_id: string | null;
+  user_id: string | null;
   created_at: string;
 }
 
@@ -35,12 +36,13 @@ function rowToTx(row: TxRow): Transaction {
     type: row.type,
     amount: Number(row.amount),
     category: row.category,
-    note: row.note || "",
-    date: row.date,
-    memberId: row.member_id,
-    familyId: row.family_id,
-    createdAt: new Date(row.created_at).getTime(),
-  };
+  note: row.note || "",
+  date: row.date,
+  memberId: row.member_id,
+  familyId: row.family_id,
+  userId: row.user_id,
+  createdAt: new Date(row.created_at).getTime(),
+};
 }
 
 interface MemberRow {
@@ -96,6 +98,7 @@ interface FamilyMemberRow {
   role: FamilyRole;
   email: string | null;
   avatar_url: string | null;
+  display_name: string | null;
   created_at: string;
 }
 
@@ -107,6 +110,7 @@ function rowToFamilyMember(row: FamilyMemberRow): FamilyMember {
     role: row.role,
     email: row.email,
     avatarUrl: row.avatar_url,
+    displayName: row.display_name,
     createdAt: new Date(row.created_at).getTime(),
   };
 }
@@ -116,7 +120,7 @@ function rowToFamilyMember(row: FamilyMemberRow): FamilyMember {
 export async function fetchMyFamily(): Promise<FamilyState | null> {
   const { data, error } = await supabase
     .from("family_members")
-    .select("id, family_id, user_id, role, email, avatar_url, created_at");
+    .select("id, family_id, user_id, role, email, avatar_url, display_name, created_at");
   if (error) throw error;
   if (!data || data.length === 0) return null;
   const familyId = data[0].family_id;
@@ -177,6 +181,11 @@ export async function removeFamilyMember(targetUserId: string): Promise<void> {
 
 export async function updateMyFamilyAvatar(avatarUrl: string | null): Promise<void> {
   const { error } = await supabase.rpc("update_my_family_avatar", { target_avatar_url: avatarUrl });
+  if (error) throw error;
+}
+
+export async function updateMyFamilyName(name: string): Promise<void> {
+  const { error } = await supabase.rpc("update_my_family_name", { target_name: name });
   if (error) throw error;
 }
 
