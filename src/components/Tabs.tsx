@@ -1273,7 +1273,7 @@ function TabPengaturan({
           </div>
           <p style={{ color: "var(--text-muted)", fontSize: 11.5, marginTop: 3 }}>
             {family
-              ? "Menu keluarga ini dikontrol bersama. Bagikan kode undangan agar pasanganmu ikut mencatat."
+              ? "Menu keluarga ini dikontrol bersama. Bagikan kode undangan agar anggota keluargamu ikut mencatat."
               : "Kelola keuangan keluarga berdua. Satu menu, dua akun saling melihat dan mencatat."}
           </p>
 
@@ -1325,7 +1325,7 @@ function TabPengaturan({
                 </button>
               </div>
               <p style={{ color: "var(--text-faint)", fontSize: 10, marginTop: 8 }}>
-                Punya kode dari pasangan? Ketik kodenya di atas untuk bergabung.
+                Punya kode undangan? Ketik kodenya di atas untuk bergabung.
               </p>
             </>
           ) : (

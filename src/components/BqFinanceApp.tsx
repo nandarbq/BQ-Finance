@@ -509,7 +509,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       await loadData();
       const code = await fetchJoinCode(fam.id);
       setJoinCode(code);
-      toast.success("Keluarga dibuat. Bagikan kode undangan ke pasanganmu.");
+      toast.success("Keluarga dibuat. Bagikan kode undangan ke anggota keluargamu.");
       return true;
     } catch (e) {
       console.error(e);
