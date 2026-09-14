@@ -20,6 +20,7 @@ create table if not exists family_members (
   role text not null check (role in ('kepala_keluarga', 'member')) default 'member',
   email text,
   avatar_url text,
+  display_name text,
   created_at timestamptz not null default now(),
   unique (family_id, user_id)
 );
@@ -116,6 +117,7 @@ alter table transactions add column if not exists family_id uuid references fami
 alter table budgets add column if not exists family_id uuid references families (id) on delete cascade;
 alter table categories add column if not exists family_id uuid references families (id) on delete cascade;
 alter table family_members add column if not exists avatar_url text;
+alter table family_members add column if not exists display_name text;
 
 create index if not exists idx_transactions_user_mode on transactions (user_id, mode);
 create index if not exists idx_transactions_user_date on transactions (user_id, date desc);
@@ -534,3 +536,23 @@ begin
   update family_members set avatar_url = target_avatar_url where user_id = auth.uid();
 end;
 $$;
+
+-- Simpan nama tampilan (display_name) ke baris family_members milik user (no-op bila belum gabung keluarga).
+-- Dipakai agar nama terlihat live oleh anggota keluarga lain, dan mengikuti rename otomatis.
+create or replace function update_my_family_name(target_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Unauthenticated';
+  end if;
+  update family_members set display_name = nullif(btrim(coalesce(target_name, '')), '') where user_id = auth.uid();
+end;
+$$;
+
+-- Izinkan outer join langsung oleh klien hanya lewat SELECT; pembaruan jalur nama tetap lewat RPC di atas.
+revoke all on function public.update_my_family_name(text) from public, anon;
+grant execute on function public.update_my_family_name(text) to authenticated;
