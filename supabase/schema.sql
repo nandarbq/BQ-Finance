@@ -170,15 +170,32 @@ alter table transactions enable row level security;
 alter table budgets enable row level security;
 alter table categories enable row level security;
 
+-- Helper anggota keluarga dengan SECURITY DEFINER agar policy tidak ber-rekursi.
+-- Query policy yang mengecek family_members secara inline akan memicu policy
+-- family_members itu sendiri (infinite recursion / 42P17). Fungsi ini menembus
+-- RLS sehingga dipakai oleh semua policy di bawah.
+create or replace function public.is_family_member(target_family_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from family_members fm
+    where fm.user_id = auth.uid() and fm.family_id = target_family_id
+  );
+$$;
+
 -- --- families: hanya bisa dilihat anggota; semua perubahan lewat RPC security definer ---
 drop policy if exists "families_select_member" on families;
 create policy "families_select_member" on families
-  for select using (exists (select 1 from family_members fm where fm.family_id = families.id and fm.user_id = auth.uid()));
+  for select using (public.is_family_member(families.id));
 
 -- --- family_members: hanya bisa dilihat anggota; join/keluar/hapus lewat RPC ---
 drop policy if exists "family_members_select_shared" on family_members;
 create policy "family_members_select_shared" on family_members
-  for select using (exists (select 1 from family_members fm where fm.family_id = family_members.family_id and fm.user_id = auth.uid()));
+  for select using (public.is_family_member(family_members.family_id));
 
 -- --- family_joins: tanpa policy; akses hanya lewat RPC (security definer) ---
 
@@ -187,28 +204,32 @@ drop policy if exists "members_select_own" on members;
 drop policy if exists "members_insert_own" on members;
 drop policy if exists "members_update_own" on members;
 drop policy if exists "members_delete_own" on members;
+drop policy if exists "members_select_shared" on members;
+drop policy if exists "members_insert_shared" on members;
+drop policy if exists "members_update_shared" on members;
+drop policy if exists "members_delete_shared" on members;
 create policy "members_select_shared" on members
   for select using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "members_insert_shared" on members
   for insert with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()) and user_id = auth.uid())
+    or (public.is_family_member(family_id) and user_id = auth.uid())
   );
 create policy "members_update_shared" on members
   for update using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   ) with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "members_delete_shared" on members
   for delete using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 
 -- --- transactions ---
@@ -216,28 +237,32 @@ drop policy if exists "transactions_select_own" on transactions;
 drop policy if exists "transactions_insert_own" on transactions;
 drop policy if exists "transactions_update_own" on transactions;
 drop policy if exists "transactions_delete_own" on transactions;
+drop policy if exists "transactions_select_shared" on transactions;
+drop policy if exists "transactions_insert_shared" on transactions;
+drop policy if exists "transactions_update_shared" on transactions;
+drop policy if exists "transactions_delete_shared" on transactions;
 create policy "transactions_select_shared" on transactions
   for select using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "transactions_insert_shared" on transactions
   for insert with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()) and user_id = auth.uid())
+    or (public.is_family_member(family_id) and user_id = auth.uid())
   );
 create policy "transactions_update_shared" on transactions
   for update using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   ) with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "transactions_delete_shared" on transactions
   for delete using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 
 -- --- budgets ---
@@ -245,28 +270,32 @@ drop policy if exists "budgets_select_own" on budgets;
 drop policy if exists "budgets_insert_own" on budgets;
 drop policy if exists "budgets_update_own" on budgets;
 drop policy if exists "budgets_delete_own" on budgets;
+drop policy if exists "budgets_select_shared" on budgets;
+drop policy if exists "budgets_insert_shared" on budgets;
+drop policy if exists "budgets_update_shared" on budgets;
+drop policy if exists "budgets_delete_shared" on budgets;
 create policy "budgets_select_shared" on budgets
   for select using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "budgets_insert_shared" on budgets
   for insert with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()) and user_id = auth.uid())
+    or (public.is_family_member(family_id) and user_id = auth.uid())
   );
 create policy "budgets_update_shared" on budgets
   for update using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   ) with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "budgets_delete_shared" on budgets
   for delete using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 
 -- --- categories ---
@@ -274,28 +303,32 @@ drop policy if exists "categories_select_own" on categories;
 drop policy if exists "categories_insert_own" on categories;
 drop policy if exists "categories_update_own" on categories;
 drop policy if exists "categories_delete_own" on categories;
+drop policy if exists "categories_select_shared" on categories;
+drop policy if exists "categories_insert_shared" on categories;
+drop policy if exists "categories_update_shared" on categories;
+drop policy if exists "categories_delete_shared" on categories;
 create policy "categories_select_shared" on categories
   for select using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "categories_insert_shared" on categories
   for insert with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()) and user_id = auth.uid())
+    or (public.is_family_member(family_id) and user_id = auth.uid())
   );
 create policy "categories_update_shared" on categories
   for update using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   ) with check (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 create policy "categories_delete_shared" on categories
   for delete using (
     (family_id is null and user_id = auth.uid())
-    or (family_id in (select fm.family_id from family_members fm where fm.user_id = auth.uid()))
+    or public.is_family_member(family_id)
   );
 
 -- =========================================================
