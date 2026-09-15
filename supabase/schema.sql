@@ -556,3 +556,16 @@ $$;
 -- Izinkan outer join langsung oleh klien hanya lewat SELECT; pembaruan jalur nama tetap lewat RPC di atas.
 revoke all on function public.update_my_family_name(text) from public, anon;
 grant execute on function public.update_my_family_name(text) to authenticated;
+
+-- =========================================================
+-- Realtime: perubahan anggota keluarga (nama tampilan, foto,
+-- role) otomatis ter-sync ke semua anggota tanpa perlu reload.
+-- Idempoten: tabel yang sudah masuk publication dilewati.
+-- =========================================================
+do $$
+begin
+  alter publication supabase_realtime add table family_members;
+exception
+  when duplicate_object then
+    null;
+end $$;

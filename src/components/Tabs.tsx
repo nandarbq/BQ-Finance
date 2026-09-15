@@ -1389,7 +1389,7 @@ function TabPengaturan({
                 {family.members.map((m) => {
                   const isMe = m.userId === userId;
                   const isKepalaRole = m.role === "kepala_keluarga";
-                  const nameToShow = isMe ? displayName : m.email ? nameFromEmail(m.email) : "Anggota";
+                  const nameToShow = isMe ? displayName : m.displayName || (m.email ? nameFromEmail(m.email) : "Anggota");
                   const confirmingRemove = confirmRemoveUser === m.userId;
                   const memberAvatar = isMe ? avatar || m.avatarUrl : m.avatarUrl;
                   return (

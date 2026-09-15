@@ -205,6 +205,22 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     return () => clearInterval(id);
   }, [activeTab, refreshFamily]);
 
+  const familyId = family?.family.id ?? null;
+  useEffect(() => {
+    if (!familyId) return;
+    const channel = supabase
+      .channel("family-live-" + familyId)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "family_members", filter: "family_id=eq." + familyId },
+        () => refreshFamily()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [familyId, refreshFamily]);
+
   const onPullStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
     if (!el || el.scrollTop > 0) return;
