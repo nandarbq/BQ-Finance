@@ -738,6 +738,11 @@ function TabTransaksi({
                       <p style={{ color: "var(--text-muted)", fontSize: 10.5 }} className="truncate">
                         {t.note ? t.note : member ? member.name : "\u00A0"}
                       </p>
+                      {mode === "keluarga" && adderName && (
+                        <p style={{ color: "var(--text-faint)", fontSize: 10 }} className="truncate">
+                          Ditambahkan oleh {adderName}
+                        </p>
+                      )}
                     </div>
                     {!isConfirm ? (
                       <>

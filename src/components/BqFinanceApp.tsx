@@ -950,6 +950,7 @@ onLeaveFamily={handleLeaveFamily}
           <TxDetailSheet
             tx={detailTx}
             members={members}
+            family={family}
             categories={categories}
             onClose={() => setDetailTx(null)}
             onEdit={handleEditFromDetail}

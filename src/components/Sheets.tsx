@@ -16,10 +16,10 @@ import {
   PieChart as PieIcon,
   FileDown,
 } from "lucide-react";
-import { todayISO, formatDateShort } from "../lib/appUtils";
+import { todayISO, formatDateShort, nameFromEmail } from "../lib/appUtils";
 import { formatRupiah } from "../lib/format";
 import { getCatMeta } from "../lib/categoryMeta";
-import type { Category, Member, Transaction } from "../lib/types";
+import type { Category, FamilyState, Member, Transaction } from "../lib/types";
 import { Avatar, ProfileAvatar } from "./ui";
 
 interface CropSheetProps {
@@ -282,16 +282,19 @@ function ProfileSheet({ onClose, email, avatar, name, onFileSelect, onRemoveAvat
 interface TxDetailSheetProps {
   tx: Transaction;
   members: Member[];
+  family: FamilyState | null;
   onClose: () => void;
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string) => void;
   categories: Category[];
 }
 
-function TxDetailSheet({ tx, members, onClose, onEdit, onDelete, categories }: TxDetailSheetProps) {
+function TxDetailSheet({ tx, members, family, onClose, onEdit, onDelete, categories }: TxDetailSheetProps) {
   const meta = getCatMeta(categories, tx.type, tx.category);
   const Icon = meta.icon;
   const member = members.find((m) => m.id === tx.memberId);
+  const adder = family?.members.find((fm) => fm.userId === tx.userId);
+  const adderName = adder ? adder.displayName || nameFromEmail(adder.email || "") || "Anggota" : null;
   const fullDate = new Date(tx.date + "T00:00:00").toLocaleDateString("id-ID", {
     weekday: "long",
     day: "numeric",
@@ -382,6 +385,15 @@ function TxDetailSheet({ tx, members, onClose, onEdit, onDelete, categories }: T
                 <Avatar name={member.name} color={member.color} size={18} />
                 <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{member.name}</span>
               </span>
+            </div>
+          )}
+          {adderName && (
+            <div
+              className="flex items-center justify-between px-4 py-2.5"
+              style={{ borderBottom: "1px solid var(--border)" }}
+            >
+              <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Input oleh</span>
+              <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{adderName}</span>
             </div>
           )}
           <div className="flex items-center justify-between px-4 py-2.5">
