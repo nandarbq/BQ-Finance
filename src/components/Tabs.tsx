@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { FamilyState, Mode, Transaction, Member, Budget, Category, TabId } from "../lib/types";
 import {
@@ -30,6 +30,8 @@ import {
   KeyRound,
   DoorOpen,
   Crown,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "./Toast";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
@@ -75,6 +77,12 @@ function TabBeranda({
   categories,
   hasFamily,
 }: TabBerandaProps) {
+  const [hideSaldo, setHideSaldo] = useState<boolean>(
+    () => localStorage.getItem("bqfinance_hide_saldo") === "1"
+  );
+  useEffect(() => {
+    localStorage.setItem("bqfinance_hide_saldo", hideSaldo ? "1" : "0");
+  }, [hideSaldo]);
   const curKey = monthKeyFor(0);
   const monthTx = useMemo(() => modeTx.filter((t) => t.date.startsWith(curKey)), [modeTx, curKey]);
   const totalIncome = useMemo(() => modeTx.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0), [modeTx]);
@@ -157,18 +165,36 @@ function TabBeranda({
               <span style={{ color: "var(--blue)", fontSize: 10.5, fontWeight: 600 }}>Total</span>
             </div>
           </div>
-          <p
-            className="mt-1.5"
-            style={{
-              fontFamily: "'Sora', sans-serif",
-              fontWeight: 700,
-              fontSize: 30,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            {formatRupiah(balanceDisplay)}
-          </p>
+          <div className="flex items-center gap-2 mt-1.5">
+            <p
+              key={hideSaldo ? "hidden" : "shown"}
+              className="bqfinance-swalter"
+              style={{
+                fontFamily: "'Sora', sans-serif",
+                fontWeight: 700,
+                fontSize: 30,
+                color: "var(--text-primary)",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {hideSaldo ? "Rp •••••" : formatRupiah(balanceDisplay)}
+            </p>
+            <button
+              type="button"
+              onClick={() => setHideSaldo((v) => !v)}
+              aria-label={hideSaldo ? "Tampilkan saldo" : "Sembunyikan saldo"}
+              className="flex-shrink-0 transition-transform active:scale-90"
+              style={{
+                color: "var(--text-muted)",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 2,
+              }}
+            >
+              {hideSaldo ? <Eye size={18} /> : <EyeOff size={18} />}
+            </button>
+          </div>
           <div className="flex items-center gap-4 mt-4">
             <div className="flex items-center gap-2">
               <div
@@ -180,7 +206,9 @@ function TabBeranda({
               <div>
                 <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Pemasukan bln ini</p>
                 <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 600 }}>
-                  {formatRupiah(monthIncome)}
+                  <span key={hideSaldo ? "h" : "s"} className="bqfinance-swalter">
+                    {hideSaldo ? "Rp •••" : formatRupiah(monthIncome)}
+                  </span>
                 </p>
               </div>
             </div>
@@ -194,7 +222,9 @@ function TabBeranda({
               <div>
                 <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Pengeluaran bln ini</p>
                 <p style={{ color: "var(--text-primary)", fontSize: 13, fontWeight: 600 }}>
-                  {formatRupiah(monthExpense)}
+                  <span key={hideSaldo ? "h" : "s"} className="bqfinance-swalter">
+                    {hideSaldo ? "Rp •••" : formatRupiah(monthExpense)}
+                  </span>
                 </p>
               </div>
             </div>

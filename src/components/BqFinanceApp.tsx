@@ -700,8 +700,10 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
         @keyframes bqfinance-sheetup { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .bqfinance-tabfade { animation: bqfinance-tabfade 0.25s ease-out; }
         @keyframes bqfinance-tabfade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .bqfinance-swalter { animation: bqfinance-swalter 0.3s cubic-bezier(0.22,1,0.36,1); }
+        @keyframes bqfinance-swalter { from { opacity: 0; transform: translateY(4px) scale(0.97); filter: blur(3px); } to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } }
         @media (prefers-reduced-motion: reduce) {
-          .bqfinance-blob, .bqfinance-fade-in, .bqfinance-sheet-up, .bqfinance-tabfade { animation: none !important; }
+          .bqfinance-blob, .bqfinance-fade-in, .bqfinance-sheet-up, .bqfinance-tabfade, .bqfinance-swalter { animation: none !important; }
         }
       `}</style>
 
