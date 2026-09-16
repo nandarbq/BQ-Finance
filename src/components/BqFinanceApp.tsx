@@ -208,16 +208,21 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const familyId = family?.family.id ?? null;
   useEffect(() => {
     if (!familyId) return;
-    const channel = supabase
-      .channel("family-live-" + familyId)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "family_members", filter: "family_id=eq." + familyId },
-        () => refreshFamily()
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel("family-live-" + familyId)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "family_members", filter: "family_id=eq." + familyId },
+          () => refreshFamily()
+        )
+        .subscribe(() => {});
+    } catch (e) {
+      console.error("realtime subscribe failed:", e);
+    }
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [familyId, refreshFamily]);
 
