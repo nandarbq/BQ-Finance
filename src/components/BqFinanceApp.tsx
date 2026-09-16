@@ -942,7 +942,7 @@ onLeaveFamily={handleLeaveFamily}
               height: 52,
               borderRadius: 999,
               right: 18,
-              bottom: 74,
+              bottom: "calc(env(safe-area-inset-bottom, 6px) + 72px)",
               background: "linear-gradient(135deg,var(--blue-light),var(--blue))",
               boxShadow: "0 8px 22px rgba(0,171,107,0.4)",
             }}
