@@ -528,6 +528,10 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const handleCreateFamily = useCallback(async () => {
     try {
       const fam = await createFamily();
+      await Promise.all([
+        updateMyFamilyName(displayName).catch((e) => console.error("sync family name:", e)),
+        updateMyFamilyAvatar(avatar).catch((e) => console.error("sync family avatar:", e)),
+      ]);
       await loadData();
       const code = await fetchJoinCode(fam.id);
       setJoinCode(code);
@@ -538,12 +542,16 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       toast.error(errMsg(e));
       return false;
     }
-  }, [loadData]);
+  }, [loadData, displayName, avatar]);
 
   const handleJoinFamily = useCallback(
     async (code: string): Promise<boolean> => {
       try {
         const famId = await joinFamilyByCode(code.trim());
+        await Promise.all([
+          updateMyFamilyName(displayName).catch((e) => console.error("sync family name:", e)),
+          updateMyFamilyAvatar(avatar).catch((e) => console.error("sync family avatar:", e)),
+        ]);
         await loadData();
         const c = await fetchJoinCode(famId);
         setJoinCode(c);
@@ -555,7 +563,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
         return false;
       }
     },
-    [loadData]
+    [loadData, displayName, avatar]
   );
 
   const handleRegenerateCode = useCallback(async () => {
