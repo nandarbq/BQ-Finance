@@ -58,8 +58,13 @@ function QuickAddSheet({
   const [orderIds, setOrderIds] = useState<string[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const indicatorRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<{ id: string; startIndex: number; startContentY: number; target: number } | null>(null);
+  const dragStateRef = useRef<{
+    id: string;
+    startIndex: number;
+    startContentY: number;
+    spacing: number;
+    slot: number;
+  } | null>(null);
   const orderStateRef = useRef<string[]>([]);
   const prevCatsKeyRef = useRef("");
   const catsKey = cats.map((c) => c.id).join(",");
@@ -82,14 +87,16 @@ function QuickAddSheet({
     });
   };
 
-  function resetDragVisuals() {
-    const drag = dragStateRef.current;
-    const list = listRef.current;
-    if (list && drag) {
-      const row = list.children[drag.startIndex] as HTMLElement | undefined;
-      if (row) row.style.transform = "";
+  function computeSlot(rows: HTMLElement[], startIndex: number, contentY: number): number {
+    let insertBefore = rows.length;
+    for (let i = 0; i < rows.length; i++) {
+      if (i === startIndex) continue;
+      if (contentY < rows[i].offsetTop + rows[i].offsetHeight / 2) {
+        insertBefore = i;
+        break;
+      }
     }
-    if (indicatorRef.current) indicatorRef.current.style.opacity = "0";
+    return insertBefore > startIndex ? insertBefore - 1 : insertBefore;
   }
 
   function handleGripPointerDown(e: ReactPointerEvent<HTMLButtonElement>, cat: Category) {
@@ -100,11 +107,20 @@ function QuickAddSheet({
     if (!list) return;
     const rect = list.getBoundingClientRect();
     const startIndex = orderIds.indexOf(cat.id);
+    const row0 = list.children[0] as HTMLElement | undefined;
+    const row1 = list.children[1] as HTMLElement | undefined;
+    const spacing = row0 && row1 ? row1.offsetTop - row0.offsetTop : row0 ? row0.offsetHeight + 4 : 40;
+    for (let i = 0; i < list.children.length; i++) {
+      const r = list.children[i] as HTMLElement;
+      r.style.transition = i === startIndex ? "none" : "transform 120ms ease";
+      if (i !== startIndex) r.style.transform = "";
+    }
     dragStateRef.current = {
       id: cat.id,
       startIndex,
       startContentY: e.clientY - rect.top + list.scrollTop,
-      target: startIndex,
+      spacing,
+      slot: startIndex,
     };
     setDraggingId(cat.id);
   }
@@ -120,43 +136,72 @@ function QuickAddSheet({
     else if (e.clientY > rect.bottom - 24) list.scrollTop += 12;
     const contentY = e.clientY - rect.top + list.scrollTop;
     const rows = Array.from(list.children) as HTMLElement[];
+    const slot = computeSlot(rows, drag.startIndex, contentY);
+    const slotChanged = slot !== drag.slot;
+    drag.slot = slot;
     const draggedRow = rows[drag.startIndex];
-    if (draggedRow) draggedRow.style.transform = "translateY(" + (contentY - drag.startContentY) + "px)";
-    let insertBefore = rows.length;
-    for (let i = 0; i < rows.length; i++) {
-      if (i === drag.startIndex) continue;
-      if (contentY < rows[i].offsetTop + rows[i].offsetHeight / 2) {
-        insertBefore = i;
-        break;
+    if (draggedRow) {
+      const baseDy = (slot - drag.startIndex) * drag.spacing;
+      const within = contentY - drag.startContentY - baseDy;
+      const offset = Math.max(-drag.spacing / 2, Math.min(drag.spacing / 2, within));
+      draggedRow.style.transition = slotChanged ? "transform 120ms ease" : "none";
+      draggedRow.style.transform = "translateY(" + (baseDy + offset) + "px)";
+      if (slotChanged) {
+        requestAnimationFrame(() => {
+          if (dragStateRef.current?.id === drag.id) draggedRow.style.transition = "none";
+        });
       }
     }
-    drag.target = insertBefore > drag.startIndex ? insertBefore - 1 : insertBefore;
-    const indicator = indicatorRef.current;
-    if (indicator) {
-      const last = rows[rows.length - 1];
-      const lineY = insertBefore === rows.length ? last.offsetTop + last.offsetHeight : rows[insertBefore].offsetTop;
-      const top = Math.max(0, Math.min(lineY - list.scrollTop, list.clientHeight - 3));
-      indicator.style.top = top + "px";
-      indicator.style.opacity = "1";
+    for (let i = 0; i < rows.length; i++) {
+      if (i === drag.startIndex) continue;
+      let shift = 0;
+      if (drag.slot !== drag.startIndex) {
+        if (drag.slot > drag.startIndex && i > drag.startIndex && i <= drag.slot) shift = -drag.spacing;
+        else if (drag.slot < drag.startIndex && i >= drag.slot && i < drag.startIndex) shift = drag.spacing;
+      }
+      rows[i].style.transform = shift ? "translateY(" + shift + "px)" : "";
     }
   }
 
   function handleGripPointerUp() {
     const drag = dragStateRef.current;
-    if (drag && drag.target !== drag.startIndex) {
-      const next = [...orderIds];
-      const [moved] = next.splice(drag.startIndex, 1);
-      next.splice(drag.target, 0, moved);
-      setOrder(() => next);
-      void onReorderCategories(next);
+    const list = listRef.current;
+    if (drag && list) {
+      const rows = Array.from(list.children) as HTMLElement[];
+      const draggedRow = rows[drag.startIndex];
+      if (draggedRow) {
+        draggedRow.style.transition = "transform 120ms ease";
+        draggedRow.style.transform = "";
+      }
+      for (let i = 0; i < rows.length; i++) {
+        if (i !== drag.startIndex) rows[i].style.transform = "";
+      }
+      if (drag.slot !== drag.startIndex) {
+        const next = [...orderIds];
+        const [moved] = next.splice(drag.startIndex, 1);
+        next.splice(drag.slot, 0, moved);
+        setOrder(() => next);
+        void onReorderCategories(next);
+      }
     }
-    resetDragVisuals();
     dragStateRef.current = null;
     setDraggingId(null);
   }
 
   function handleGripPointerCancel() {
-    resetDragVisuals();
+    const drag = dragStateRef.current;
+    const list = listRef.current;
+    if (drag && list) {
+      const rows = Array.from(list.children) as HTMLElement[];
+      const draggedRow = rows[drag.startIndex];
+      if (draggedRow) {
+        draggedRow.style.transition = "transform 120ms ease";
+        draggedRow.style.transform = "";
+      }
+      for (let i = 0; i < rows.length; i++) {
+        if (i !== drag.startIndex) rows[i].style.transform = "";
+      }
+    }
     dragStateRef.current = null;
     setDraggingId(null);
   }
@@ -504,16 +549,6 @@ function QuickAddSheet({
                   className="relative flex flex-col gap-1 mb-2.5 max-h-52 overflow-y-auto pr-0.5"
                   style={{ touchAction: draggingId ? "none" : undefined }}
                 >
-                  <div
-                    ref={indicatorRef}
-                    className="pointer-events-none absolute left-1 right-1 z-20 rounded-full"
-                    style={{
-                      height: 3,
-                      top: 0,
-                      opacity: 0,
-                      background: "color-mix(in srgb, var(--blue) 70%, transparent)",
-                    }}
-                  />
                   {orderedCats.map((c) => {
                     const Icon = ICON_MAP[c.icon] || MoreHorizontal;
                     const confirmed = confirmDeleteId === c.id;
@@ -527,8 +562,7 @@ function QuickAddSheet({
                             draggingId === c.id
                               ? "color-mix(in srgb, var(--blue) 10%, var(--bg-app))"
                               : "var(--bg-app)",
-                          boxShadow: draggingId === c.id ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
-                          opacity: draggingId && draggingId !== c.id ? 0.55 : 1,
+                          boxShadow: draggingId === c.id ? "0 2px 8px rgba(0,0,0,0.18)" : "none",
                         }}
                       >
                         <button
