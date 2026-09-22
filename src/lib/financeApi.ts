@@ -36,13 +36,13 @@ function rowToTx(row: TxRow): Transaction {
     type: row.type,
     amount: Number(row.amount),
     category: row.category,
-  note: row.note || "",
-  date: row.date,
-  memberId: row.member_id,
-  familyId: row.family_id,
-  userId: row.user_id,
-  createdAt: new Date(row.created_at).getTime(),
-};
+    note: row.note || "",
+    date: row.date,
+    memberId: row.member_id,
+    familyId: row.family_id,
+    userId: row.user_id,
+    createdAt: new Date(row.created_at).getTime(),
+  };
 }
 
 interface MemberRow {
@@ -300,19 +300,12 @@ export async function deleteMemberById(id: string): Promise<void> {
 /* ================================ Budgets ================================ */
 
 export async function fetchBudgets(): Promise<Budget[]> {
-  const { data, error } = await supabase
-    .from("budgets")
-    .select("*")
-    .order("created_at", { ascending: true });
+  const { data, error } = await supabase.from("budgets").select("*").order("created_at", { ascending: true });
   if (error) throw error;
   return (data || []).map(rowToBudget);
 }
 
-export async function upsertBudget(
-  userId: string,
-  familyId: string | null,
-  draft: BudgetDraft
-): Promise<Budget> {
+export async function upsertBudget(userId: string, familyId: string | null, draft: BudgetDraft): Promise<Budget> {
   if (draft.mode === "keluarga") {
     if (!familyId) throw new Error("Tidak ada keluarga aktif.");
     const { data: existing, error: exErr } = await supabase
@@ -395,31 +388,66 @@ function dedupeCategories(rows: Category[]): Category[] {
   return Array.from(map.values());
 }
 
+async function seedCategories(rows: Category[], draft: CategoryDraft[], familyId: string | null): Promise<Category[]> {
+  const existing = new Set(rows.map((c) => c.type + "|" + c.label.toLowerCase()));
+  const missing = draft.filter((c) => !existing.has(c.type + "|" + c.label.toLowerCase()));
+  if (missing.length === 0) return rows;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userId = user?.id;
+  if (!userId) return rows;
+  try {
+    await supabase
+      .from("categories")
+      .insert(missing.map((c) => ({ ...c, user_id: userId, family_id: familyId, is_default: true })));
+  } catch (e) {
+    console.warn("seed categories:", e);
+  }
+  return rows;
+}
+
 export async function fetchCategories(): Promise<Category[]> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userId = user?.id;
+  if (!userId) return [];
   const { data, error } = await supabase
     .from("categories")
     .select("*")
+    .eq("user_id", userId)
+    .is("family_id", null)
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = (data || []).map(rowToCategory);
-  if (rows.length === 0) {
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id;
-    if (!userId) return [];
-    const { error: seedError } = await supabase.from("categories").upsert(
-      DEFAULT_CATEGORIES.map((c) => ({ ...c, user_id: userId, is_default: true })),
-      { onConflict: "user_id,type,label", ignoreDuplicates: true }
-    );
-    if (seedError) throw seedError;
-    const { data: seeded, error: fetchError } = await supabase
-      .from("categories")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: true });
-    if (fetchError) throw fetchError;
-    return dedupeCategories((seeded || []).map(rowToCategory));
-  }
-  return dedupeCategories(rows);
+  await seedCategories(rows, DEFAULT_CATEGORIES, null);
+  const { data: seeded, error: fetchError } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("user_id", userId)
+    .is("family_id", null)
+    .order("created_at", { ascending: true });
+  if (fetchError) throw fetchError;
+  return dedupeCategories((seeded || []).map(rowToCategory));
+}
+
+export async function fetchFamilyCategories(familyId: string): Promise<Category[]> {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("family_id", familyId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const rows = (data || []).map(rowToCategory);
+  await seedCategories(rows, DEFAULT_CATEGORIES, familyId);
+  const { data: seeded, error: fetchError } = await supabase
+    .from("categories")
+    .select("*")
+    .eq("family_id", familyId)
+    .order("created_at", { ascending: true });
+  if (fetchError) throw fetchError;
+  return dedupeCategories((seeded || []).map(rowToCategory));
 }
 
 export async function insertCategory(
@@ -434,36 +462,11 @@ export async function insertCategory(
   const color = draft.color || "var(--text-muted)";
   const byLabel = (c: Category) => c.type === type && c.label.toLowerCase() === label.toLowerCase();
 
-  if (familyId) {
-    const shared = existing.find((c) => byLabel(c) && c.familyId === familyId);
-    if (shared) return shared;
-    const personal = existing.find((c) => byLabel(c) && c.familyId === null);
-    if (personal) return promoteCategoryToFamily(personal.id, familyId);
-    const { data, error } = await supabase
-      .from("categories")
-      .insert({ user_id: userId, family_id: familyId, type, label, icon, color, is_default: false })
-      .select()
-      .single();
-    if (error) throw error;
-    return rowToCategory(data);
-  }
-
-  const personal = existing.find((c) => byLabel(c) && c.familyId === null);
-  if (personal) return personal;
+  const dup = existing.find(byLabel);
+  if (dup) return dup;
   const { data, error } = await supabase
     .from("categories")
-    .insert({ user_id: userId, family_id: null, type, label, icon, color, is_default: false })
-    .select()
-    .single();
-  if (error) throw error;
-  return rowToCategory(data);
-}
-
-export async function promoteCategoryToFamily(id: string, familyId: string): Promise<Category> {
-  const { data, error } = await supabase
-    .from("categories")
-    .update({ family_id: familyId })
-    .eq("id", id)
+    .insert({ user_id: userId, family_id: familyId, type, label, icon, color, is_default: false })
     .select()
     .single();
   if (error) throw error;

@@ -22,7 +22,7 @@ vi.mock("./supabaseClient", () => {
       getUser: vi.fn(() => Promise.resolve({ data: { user: { id: "u1" } }, error: null })),
     },
   };
-  ["select", "insert", "update", "upsert", "delete", "eq", "order"].forEach((name) => {
+  ["select", "insert", "update", "upsert", "delete", "eq", "is", "order"].forEach((name) => {
     chain[name] = vi.fn(() => methods);
     methods[name] = chain[name];
   });
@@ -48,6 +48,7 @@ import {
   upsertBudget,
   deleteBudgetById,
   fetchCategories,
+  fetchFamilyCategories,
   insertCategory,
   updateCategory,
   deleteCategory,
@@ -62,7 +63,11 @@ import {
 } from "./financeApi";
 
 function setupChain(fetchResult, singleResult = fetchResult, maybeSingleResult = fetchResult) {
-  chainResolvers.set(fetchResult || { data: null, error: null }, singleResult || { data: null, error: null }, maybeSingleResult || { data: null, error: null });
+  chainResolvers.set(
+    fetchResult || { data: null, error: null },
+    singleResult || { data: null, error: null },
+    maybeSingleResult || { data: null, error: null }
+  );
 }
 
 function settledChain(value) {
@@ -74,6 +79,7 @@ function settledChain(value) {
     upsert: () => self,
     delete: () => self,
     eq: () => self,
+    is: () => self,
     order: () => self,
     single: () => Promise.resolve(value),
     maybeSingle: () => Promise.resolve(value),
@@ -520,22 +526,47 @@ describe("financeApi - categories", () => {
     expect(result[0].id).toBe("c-def");
   });
 
-  it("fetchCategories throws when seeding default categories fails", async () => {
-    setupChain({ data: [], error: null });
-    supabase.from.mockReturnValueOnce(settledChain({ data: [], error: null })).mockReturnValueOnce(
-      settledChain({ data: null, error: { message: "seed failed" } })
-    );
+  it("fetchFamilyCategories returns mapped family categories", async () => {
+    setupChain({ data: [{ ...catRow, id: "cf1", family_id: "fam1" }], error: null });
+    const result = await fetchFamilyCategories("fam1");
 
-    await expect(fetchCategories()).rejects.toThrow("seed failed");
+    expect(supabase.eq).toHaveBeenCalledWith("family_id", "fam1");
+    expect(result).toEqual([
+      {
+        id: "cf1",
+        type: "out",
+        label: "Makanan",
+        icon: "UtensilsCrossed",
+        color: "var(--negative)",
+        isDefault: true,
+        familyId: "fam1",
+      },
+    ]);
+  });
+
+  it("fetchFamilyCategories seeds defaults when family has none", async () => {
+    setupChain({ data: [], error: null });
+    supabase.from
+      .mockReturnValueOnce(settledChain({ data: [], error: null }))
+      .mockReturnValueOnce(settledChain({ data: null, error: null }))
+      .mockReturnValueOnce(
+        settledChain({
+          data: [{ ...catRow, id: "c-def", family_id: "fam1" }],
+          error: null,
+        })
+      );
+    const result = await fetchFamilyCategories("fam1");
+
+    expect(supabase.auth.getUser).toHaveBeenCalled();
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe("c-def");
+    expect(result[0].familyId).toBe("fam1");
   });
 
   it("insertCategory pribadi returns the existing personal duplicate", async () => {
-    const result = await insertCategory(
-      "u1",
-      null,
-      { type: "out", label: "Makanan" },
-      [{ ...catRow, id: "existing", isDefault: false, familyId: null }]
-    );
+    const result = await insertCategory("u1", null, { type: "out", label: "Makanan" }, [
+      { ...catRow, id: "existing", isDefault: false, familyId: null },
+    ]);
 
     expect(supabase.from).not.toHaveBeenCalled();
     expect(result.id).toBe("existing");
@@ -558,17 +589,30 @@ describe("financeApi - categories", () => {
     });
   });
 
-  it("insertCategory keluarga promotes personal category to family", async () => {
-    setupChain({ data: { ...catRow, family_id: "fam1" }, error: null });
-    const result = await insertCategory(
-      "u1",
-      "fam1",
-      { type: "out", label: "Makanan" },
-      [{ ...catRow, id: "c1", isDefault: false, familyId: null }]
-    );
+  it("insertCategory keluarga reuses existing personal category without promotion", async () => {
+    const result = await insertCategory("u1", "fam1", { type: "out", label: "Makanan" }, [
+      { ...catRow, id: "c1", isDefault: false, familyId: null },
+    ]);
 
-    expect(supabase.update).toHaveBeenCalledWith({ family_id: "fam1" });
-    expect(supabase.eq).toHaveBeenCalledWith("id", "c1");
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(supabase.update).not.toHaveBeenCalled();
+    expect(result.id).toBe("c1");
+    expect(result.familyId).toBeNull();
+  });
+
+  it("insertCategory keluarga inserts family category when no duplicate", async () => {
+    setupChain({ data: { ...catRow, id: "cf1", family_id: "fam1", is_default: false }, error: null });
+    const result = await insertCategory("u1", "fam1", { type: "out", label: "Kost" }, []);
+
+    expect(supabase.insert).toHaveBeenCalledWith({
+      user_id: "u1",
+      family_id: "fam1",
+      type: "out",
+      label: "Kost",
+      icon: "MoreHorizontal",
+      color: "var(--text-muted)",
+      is_default: false,
+    });
     expect(result.familyId).toBe("fam1");
   });
 

@@ -89,9 +89,15 @@ delete from categories a
     and a.type = b.type
     and a.label = b.label;
 
--- Unique agar seed default tidak pernah dobel (dipakai juga oleh onConflict DO NOTHING)
+-- Unique agar seed default tidak pernah dobel.
+-- Pribadi & keluarga independen: index parsial agar user boleh punya label yang sama
+-- pada kategori pribadi (family_id IS NULL) dan kategori keluarga (family_id NOT NULL).
 drop index if exists idx_categories_user;
-create unique index if not exists idx_categories_user_type_label on categories (user_id, type, label);
+drop index if exists idx_categories_user_type_label;
+create unique index if not exists idx_categories_user_type_label
+  on categories (user_id, type, label) where family_id is null;
+create unique index if not exists idx_categories_family_type_label
+  on categories (family_id, type, label) where family_id is not null;
 
 -- =========================================================
 -- Tabel anggaran (limit pengeluaran per kategori per bulan)

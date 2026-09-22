@@ -18,6 +18,7 @@ import {
   upsertBudget,
   deleteBudgetById,
   fetchCategories,
+  fetchFamilyCategories,
   insertCategory,
   updateCategory,
   deleteCategory,
@@ -90,6 +91,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [familyCategories, setFamilyCategories] = useState<Category[]>([]);
   const [family, setFamily] = useState<FamilyState | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("beranda");
@@ -131,11 +133,13 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
           console.error(e);
         }
       }
-      const [tx, mem, bdgt, cats] = await Promise.all([
+      const famId = fam ? fam.family.id : null;
+      const [tx, mem, bdgt, cats, famCats] = await Promise.all([
         fetchTransactions(),
-        fetchMembers(userId, fam ? fam.family.id : null),
+        fetchMembers(userId, famId),
         fetchBudgets(),
         fetchCategories(),
+        famId ? fetchFamilyCategories(famId) : Promise.resolve<Category[]>([]),
       ]);
       setFamily(fam);
       setJoinCode(code);
@@ -143,6 +147,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       setMembers(mem);
       setBudgets(bdgt);
       setCategories(cats);
+      setFamilyCategories(famCats);
       setLoadError("");
       return true;
     } catch (e) {
@@ -206,6 +211,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   }, [activeTab, refreshFamily]);
 
   const familyId = family?.family.id ?? null;
+  const displayCategories = mode === "keluarga" ? familyCategories : categories;
   useEffect(() => {
     if (!familyId) return;
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -360,15 +366,19 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
               label: "Urungkan",
               onClick: async () => {
                 try {
-                  const restored = await insertTransaction(userId, target.mode === "keluarga" ? target.familyId : null, {
-                    mode: target.mode,
-                    type: target.type,
-                    amount: target.amount,
-                    category: target.category,
-                    note: target.note || "",
-                    date: target.date,
-                    memberId: target.memberId,
-                  });
+                  const restored = await insertTransaction(
+                    userId,
+                    target.mode === "keluarga" ? target.familyId : null,
+                    {
+                      mode: target.mode,
+                      type: target.type,
+                      amount: target.amount,
+                      category: target.category,
+                      note: target.note || "",
+                      date: target.date,
+                      memberId: target.memberId,
+                    }
+                  );
                   setTransactions((p) => [...p, restored]);
                   toast.success("Transaksi dikembalikan");
                 } catch (e) {
@@ -472,57 +482,65 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const handleAddCategory = useCallback(
     async (draft: CategoryDraft) => {
       if (!draft || !draft.label || !draft.label.trim()) return;
+      const isFamilyMode = mode === "keluarga" && !!family;
+      const target = isFamilyMode ? familyCategories : categories;
       try {
         const cats = await insertCategory(
           userId,
-          mode === "keluarga" ? (family ? family.family.id : null) : null,
+          isFamilyMode ? family.family.id : null,
           { ...draft, label: draft.label.trim() },
-          categories
+          target
         );
-        const next = dedupeCategoriesWith([...categories, cats]);
-        setCategories(next);
+        if (cats.familyId) {
+          setFamilyCategories((prev) => dedupeCategoriesWith([...prev, cats]));
+        } else {
+          setCategories((prev) => dedupeCategoriesWith([...prev, cats]));
+        }
       } catch (e) {
         console.error(e);
         toast.error("Gagal menambah kategori.");
       }
     },
-    [userId, categories, mode, family]
+    [userId, categories, familyCategories, mode, family]
   );
 
   const handleUpdateCategory = useCallback(
     async (id: string, fields: { label: string; icon: string; color: string }) => {
-      const prev = categories;
+      const isFam = familyCategories.some((c) => c.id === id);
+      const setter = isFam ? setFamilyCategories : setCategories;
+      const prev = isFam ? familyCategories : categories;
       try {
         const updated = await updateCategory(id, {
           label: fields.label.trim(),
           icon: fields.icon,
           color: fields.color,
         });
-        const next = prev.map((c) => (c.id === id ? updated : c));
-        setCategories(next);
+        setter((p) => p.map((c) => (c.id === id ? updated : c)));
       } catch (e) {
         console.error(e);
-        setCategories(prev);
+        setter(prev);
         toast.error("Gagal mengubah kategori.");
       }
     },
-    [categories]
+    [categories, familyCategories]
   );
 
   const handleDeleteCategory = useCallback(
     async (id: string) => {
-      const prev = categories;
+      const isFam = familyCategories.some((c) => c.id === id);
+      const setter = isFam ? setFamilyCategories : setCategories;
+      const prev = isFam ? familyCategories : categories;
       const next = prev.filter((c) => c.id !== id);
-      setCategories(next);
+      setter(next);
       try {
         await deleteCategory(id);
       } catch (e) {
         console.error(e);
-        setCategories(prev);
+        setter(prev);
         toast.error("Gagal menghapus kategori.");
       }
     },
-    [categories]
+    [categories, familyCategories]
   );
 
   const handleCreateFamily = useCallback(async () => {
@@ -857,7 +875,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   members={members}
                   setActiveTab={setActiveTab}
                   openQuickAdd={openQuickAdd}
-                  categories={categories}
+                  categories={displayCategories}
                   hasFamily={!!family}
                 />
               )}
@@ -871,7 +889,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   onDelete={handleDeleteTransaction}
                   onEdit={openQuickEdit}
                   onDetail={openTxDetail}
-                  categories={categories}
+                  categories={displayCategories}
                 />
               )}
               {activeTab === "grafik" && <TabGrafik modeTx={modeTx} />}
@@ -894,13 +912,13 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   displayName={displayName}
                   avatar={avatar}
                   onNameChange={handleNameChange}
-                  categories={categories}
+                  categories={displayCategories}
                   family={family}
                   joinCode={joinCode}
                   onCreateFamily={handleCreateFamily}
                   onJoinFamily={handleJoinFamily}
                   onRegenerateCode={handleRegenerateCode}
-onLeaveFamily={handleLeaveFamily}
+                  onLeaveFamily={handleLeaveFamily}
                   onRemoveMember={handleRemoveFamilyMember}
                   onRefreshFamily={refreshFamily}
                 />
@@ -964,7 +982,7 @@ onLeaveFamily={handleLeaveFamily}
           <QuickAddSheet
             mode={mode}
             members={members}
-            categories={categories}
+            categories={displayCategories}
             editingTx={editingTx}
             onClose={() => {
               setQuickAddOpen(false);
@@ -982,7 +1000,7 @@ onLeaveFamily={handleLeaveFamily}
             tx={detailTx}
             members={members}
             family={family}
-            categories={categories}
+            categories={displayCategories}
             onClose={() => setDetailTx(null)}
             onEdit={handleEditFromDetail}
             onDelete={handleDeleteFromDetail}
