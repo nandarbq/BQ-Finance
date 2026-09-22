@@ -52,6 +52,7 @@ import {
   insertCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
   fetchMyFamily,
   createFamily,
   fetchJoinCode,
@@ -475,6 +476,7 @@ describe("financeApi - categories", () => {
     color: "var(--negative)",
     is_default: true,
     family_id: null,
+    sort_order: 1,
   };
 
   it("fetchCategories returns deduped mapped categories when rows exist", async () => {
@@ -490,6 +492,7 @@ describe("financeApi - categories", () => {
         color: "var(--negative)",
         isDefault: true,
         familyId: null,
+        sortOrder: 1,
       },
     ]);
   });
@@ -540,6 +543,7 @@ describe("financeApi - categories", () => {
         color: "var(--negative)",
         isDefault: true,
         familyId: "fam1",
+        sortOrder: 1,
       },
     ]);
   });
@@ -575,7 +579,7 @@ describe("financeApi - categories", () => {
   it("insertCategory pribadi inserts when no duplicate", async () => {
     setupChain({ data: { ...catRow, id: "c2", is_default: false }, error: null });
     await insertCategory("u1", null, { type: "in", label: "Lainnya" }, [
-      { ...catRow, id: "other", label: "Gaji", isDefault: false, familyId: null },
+      { ...catRow, id: "other", label: "Gaji", isDefault: false, familyId: null, sortOrder: 1 },
     ]);
 
     expect(supabase.insert).toHaveBeenCalledWith({
@@ -586,6 +590,7 @@ describe("financeApi - categories", () => {
       icon: "MoreHorizontal",
       color: "var(--text-muted)",
       is_default: false,
+      sort_order: 2,
     });
   });
 
@@ -612,8 +617,23 @@ describe("financeApi - categories", () => {
       icon: "MoreHorizontal",
       color: "var(--text-muted)",
       is_default: false,
+      sort_order: 1,
     });
     expect(result.familyId).toBe("fam1");
+  });
+
+  it("reorderCategories upserts sequential sort_order for ids", async () => {
+    setupChain({ data: null, error: null });
+    await reorderCategories(["c3", "c1", "c2"]);
+
+    expect(supabase.upsert).toHaveBeenCalledWith(
+      [
+        { id: "c3", sort_order: 1 },
+        { id: "c1", sort_order: 2 },
+        { id: "c2", sort_order: 3 },
+      ],
+      { onConflict: "id" }
+    );
   });
 
   it("updateCategory sends label, icon, and color", async () => {

@@ -80,6 +80,7 @@ export interface Category {
   color: string;
   isDefault: boolean;
   familyId: string | null;
+  sortOrder: number;
 }
 
 export interface CategoryDraft {

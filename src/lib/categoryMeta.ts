@@ -78,12 +78,12 @@ export const CATEGORY_COLORS: { label: string; value: string }[] = [
 ];
 
 export const MEMBER_COLORS: string[] = [
-  "var(--blue)",
   "var(--cat-teal)",
   "var(--negative)",
-  "var(--cat-lime)",
-  "var(--cat-dark)",
-  "var(--positive)",
+  "var(--member-amber)",
+  "var(--member-blue)",
+  "var(--member-purple)",
+  "var(--member-slate)",
 ];
 
 export interface CategoryMeta extends Omit<Category, "icon"> {
@@ -94,5 +94,14 @@ export function getCatMeta(categories: Category[], type: TxType, catId: string):
   const list = categories.filter((c) => c.type === type);
   const found = list.find((c) => c.label.toLowerCase() === String(catId).toLowerCase());
   if (found) return { ...found, icon: ICON_MAP[found.icon] || MoreHorizontal };
-  return { id: "", label: catId, icon: MoreHorizontal, color: "var(--text-muted)", isDefault: false, type, familyId: null };
+  return {
+    id: "",
+    label: catId,
+    icon: MoreHorizontal,
+    color: "var(--text-muted)",
+    isDefault: false,
+    type,
+    familyId: null,
+    sortOrder: 0,
+  };
 }

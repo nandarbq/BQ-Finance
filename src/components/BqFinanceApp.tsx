@@ -22,6 +22,7 @@ import {
   insertCategory,
   updateCategory,
   deleteCategory,
+  reorderCategories,
   fetchMyFamily,
   createFamily,
   fetchJoinCode,
@@ -543,6 +544,26 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     [categories, familyCategories]
   );
 
+  const handleReorderCategories = useCallback(
+    async (orderedIds: string[]) => {
+      const isFamilyMode = mode === "keluarga" && !!family;
+      const setter = isFamilyMode ? setFamilyCategories : setCategories;
+      try {
+        await reorderCategories(orderedIds);
+        setter((prev) => {
+          const byId = new Map(prev.map((c) => [c.id, c]));
+          const ordered = orderedIds.map((id) => byId.get(id)).filter(Boolean) as Category[];
+          const rest = prev.filter((c) => !orderedIds.includes(c.id));
+          return [...ordered, ...rest];
+        });
+      } catch (e) {
+        console.error(e);
+        toast.error("Gagal menyusun ulang kategori.");
+      }
+    },
+    [mode, family]
+  );
+
   const handleCreateFamily = useCallback(async () => {
     try {
       const fam = await createFamily();
@@ -993,6 +1014,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
             onAddCategory={handleAddCategory}
             onUpdateCategory={handleUpdateCategory}
             onDeleteCategory={handleDeleteCategory}
+            onReorderCategories={handleReorderCategories}
           />
         )}
         {detailTx && (

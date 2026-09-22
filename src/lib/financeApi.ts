@@ -77,6 +77,7 @@ interface CategoryRow {
   color: string;
   is_default: boolean;
   family_id: string | null;
+  sort_order: number;
 }
 
 function rowToCategory(row: CategoryRow): Category {
@@ -88,6 +89,7 @@ function rowToCategory(row: CategoryRow): Category {
     color: row.color,
     isDefault: row.is_default,
     familyId: row.family_id,
+    sortOrder: row.sort_order,
   };
 }
 
@@ -418,6 +420,7 @@ export async function fetchCategories(): Promise<Category[]> {
     .select("*")
     .eq("user_id", userId)
     .is("family_id", null)
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = (data || []).map(rowToCategory);
@@ -427,6 +430,7 @@ export async function fetchCategories(): Promise<Category[]> {
     .select("*")
     .eq("user_id", userId)
     .is("family_id", null)
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
   if (fetchError) throw fetchError;
   return dedupeCategories((seeded || []).map(rowToCategory));
@@ -437,6 +441,7 @@ export async function fetchFamilyCategories(familyId: string): Promise<Category[
     .from("categories")
     .select("*")
     .eq("family_id", familyId)
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = (data || []).map(rowToCategory);
@@ -445,6 +450,7 @@ export async function fetchFamilyCategories(familyId: string): Promise<Category[
     .from("categories")
     .select("*")
     .eq("family_id", familyId)
+    .order("sort_order", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
   if (fetchError) throw fetchError;
   return dedupeCategories((seeded || []).map(rowToCategory));
@@ -466,11 +472,29 @@ export async function insertCategory(
   if (dup) return dup;
   const { data, error } = await supabase
     .from("categories")
-    .insert({ user_id: userId, family_id: familyId, type, label, icon, color, is_default: false })
+    .insert({
+      user_id: userId,
+      family_id: familyId,
+      type,
+      label,
+      icon,
+      color,
+      is_default: false,
+      sort_order: existing.length ? Math.max(...existing.map((c) => c.sortOrder)) + 1 : 1,
+    })
     .select()
     .single();
   if (error) throw error;
   return rowToCategory(data);
+}
+
+export async function reorderCategories(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await supabase.from("categories").upsert(
+    ids.map((id, i) => ({ id, sort_order: i + 1 })),
+    { onConflict: "id" }
+  );
+  if (error) throw error;
 }
 
 export async function updateCategory(

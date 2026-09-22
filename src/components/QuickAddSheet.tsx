@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import type { ChangeEvent } from "react";
-import { X, Pencil, Plus, MoreHorizontal, Trash2, Check, Calendar } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
+import { X, Pencil, Plus, MoreHorizontal, Trash2, Check, Calendar, GripVertical } from "lucide-react";
 import { todayISO, formatDateShort } from "../lib/appUtils";
 import { ICON_MAP, CATEGORY_COLORS } from "../lib/categoryMeta";
 import type { Category, CategoryDraft, Member, Mode, Transaction, TransactionDraft, TxType } from "../lib/types";
@@ -24,6 +24,7 @@ interface QuickAddSheetProps {
   onAddCategory: (draft: CategoryDraft) => void | Promise<void>;
   onUpdateCategory: (id: string, fields: { label: string; icon: string; color: string }) => void | Promise<void>;
   onDeleteCategory: (id: string) => void | Promise<void>;
+  onReorderCategories: (orderedIds: string[]) => void | Promise<void>;
   editingTx: Transaction | null;
 }
 
@@ -37,6 +38,7 @@ function QuickAddSheet({
   onAddCategory,
   onUpdateCategory,
   onDeleteCategory,
+  onReorderCategories,
   editingTx,
 }: QuickAddSheetProps) {
   const [type, setType] = useState<TxType>(editingTx ? editingTx.type : "out");
@@ -52,6 +54,90 @@ function QuickAddSheet({
   const [showCalendar, setShowCalendar] = useState(false);
   const amount = parseInt(amountStr || "0", 10);
   const cats = categories.filter((c) => c.type === type);
+
+  const [orderIds, setOrderIds] = useState<string[]>([]);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const longPressRef = useRef<number | null>(null);
+  const movedRef = useRef(false);
+  const orderStateRef = useRef<string[]>([]);
+  const prevCatsKeyRef = useRef("");
+  const catsKey = cats.map((c) => c.id).join(",");
+
+  useEffect(() => {
+    if (prevCatsKeyRef.current === catsKey) return;
+    prevCatsKeyRef.current = catsKey;
+    const ids = catsKey ? catsKey.split(",") : [];
+    orderStateRef.current = ids;
+    setOrderIds(ids);
+  }, [catsKey]);
+
+  useEffect(() => {
+    return () => {
+      if (longPressRef.current) window.clearTimeout(longPressRef.current);
+    };
+  }, []);
+
+  const orderedCats = orderIds.map((id) => cats.find((c) => c.id === id)).filter(Boolean) as Category[];
+
+  const setOrder = (updater: (prev: string[]) => string[]) => {
+    setOrderIds((prev) => {
+      const next = updater(prev);
+      orderStateRef.current = next;
+      return next;
+    });
+  };
+
+  function handleGripPointerDown(e: ReactPointerEvent<HTMLButtonElement>, cat: Category) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (longPressRef.current) window.clearTimeout(longPressRef.current);
+    longPressRef.current = window.setTimeout(() => {
+      longPressRef.current = null;
+      movedRef.current = false;
+      setDraggingId(cat.id);
+    }, 280);
+  }
+
+  function handleGripPointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
+    if (!draggingId) return;
+    const list = listRef.current;
+    if (!list || list.children.length < 2) return;
+    e.preventDefault();
+    const rect = list.getBoundingClientRect();
+    if (e.clientY < rect.top + 28) list.scrollTop -= 12;
+    else if (e.clientY > rect.bottom - 28) list.scrollTop += 12;
+    const contentY = e.clientY - rect.top + list.scrollTop;
+    let target = list.children.length - 1;
+    for (let i = 0; i < list.children.length; i++) {
+      const rowEl = list.children[i] as HTMLElement;
+      if (contentY < rowEl.offsetTop + rowEl.offsetHeight / 2) {
+        target = i;
+        break;
+      }
+    }
+    setOrder((prev) => {
+      const from = prev.indexOf(draggingId);
+      if (from === -1 || from === target) return prev;
+      movedRef.current = true;
+      const next = [...prev];
+      next.splice(from, 1);
+      next.splice(target, 0, draggingId);
+      return next;
+    });
+  }
+
+  function handleGripPointerUp() {
+    if (longPressRef.current) {
+      window.clearTimeout(longPressRef.current);
+      longPressRef.current = null;
+    }
+    if (draggingId && movedRef.current) {
+      void onReorderCategories(orderStateRef.current);
+    }
+    setDraggingId(null);
+  }
 
   useEffect(() => {
     setCategory(null);
@@ -386,16 +472,48 @@ function QuickAddSheet({
               </>
             ) : (
               <>
-                <div className="flex flex-col gap-1 mb-2.5 max-h-52 overflow-y-auto pr-0.5">
-                  {cats.map((c) => {
+                <div
+                  ref={listRef}
+                  className="flex flex-col gap-1 mb-2.5 max-h-52 overflow-y-auto pr-0.5"
+                  style={{ touchAction: draggingId ? "none" : undefined }}
+                >
+                  {orderedCats.map((c) => {
                     const Icon = ICON_MAP[c.icon] || MoreHorizontal;
                     const confirmed = confirmDeleteId === c.id;
                     return (
                       <div
                         key={c.id}
                         className="flex items-center gap-2 px-2 py-1.5 rounded-lg"
-                        style={{ background: "var(--bg-app)" }}
+                        style={{
+                          background:
+                            draggingId === c.id
+                              ? "color-mix(in srgb, var(--blue) 10%, var(--bg-app))"
+                              : "var(--bg-app)",
+                          boxShadow: draggingId === c.id ? "0 4px 14px rgba(0,0,0,0.18)" : "none",
+                          opacity: draggingId && draggingId !== c.id ? 0.55 : 1,
+                        }}
                       >
+                        <button
+                          type="button"
+                          aria-label={"Urutkan kategori " + c.label}
+                          onPointerDown={(e) => handleGripPointerDown(e, c)}
+                          onPointerMove={handleGripPointerMove}
+                          onPointerUp={handleGripPointerUp}
+                          onPointerCancel={handleGripPointerUp}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="flex items-center justify-center flex-shrink-0 p-1 rounded"
+                          style={{
+                            touchAction: "none",
+                            cursor: "grab",
+                            userSelect: "none",
+                            WebkitUserSelect: "none",
+                            WebkitTouchCallout: "none",
+                            background:
+                              draggingId === c.id ? "color-mix(in srgb, var(--blue) 18%, transparent)" : "transparent",
+                          }}
+                        >
+                          <GripVertical size={13} color={draggingId === c.id ? "var(--blue)" : "var(--text-faint)"} />
+                        </button>
                         <div
                           className="flex items-center justify-center flex-shrink-0"
                           style={{

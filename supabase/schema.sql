@@ -122,6 +122,7 @@ alter table members add column if not exists family_id uuid references families 
 alter table transactions add column if not exists family_id uuid references families (id) on delete cascade;
 alter table budgets add column if not exists family_id uuid references families (id) on delete cascade;
 alter table categories add column if not exists family_id uuid references families (id) on delete cascade;
+alter table categories add column if not exists sort_order integer not null default 0;
 alter table family_members add column if not exists avatar_url text;
 alter table family_members add column if not exists display_name text;
 
