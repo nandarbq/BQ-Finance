@@ -490,11 +490,16 @@ export async function insertCategory(
 
 export async function reorderCategories(ids: string[]): Promise<void> {
   if (!ids.length) return;
-  const { error } = await supabase.from("categories").upsert(
-    ids.map((id, i) => ({ id, sort_order: i + 1 })),
-    { onConflict: "id" }
+  const results = await Promise.all(
+    ids.map((id, i) =>
+      supabase
+        .from("categories")
+        .update({ sort_order: i + 1 })
+        .eq("id", id)
+    )
   );
-  if (error) throw error;
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
 }
 
 export async function updateCategory(

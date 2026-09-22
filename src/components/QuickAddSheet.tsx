@@ -58,8 +58,8 @@ function QuickAddSheet({
   const [orderIds, setOrderIds] = useState<string[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
-  const longPressRef = useRef<number | null>(null);
-  const movedRef = useRef(false);
+  const indicatorRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{ id: string; startIndex: number; startContentY: number; target: number } | null>(null);
   const orderStateRef = useRef<string[]>([]);
   const prevCatsKeyRef = useRef("");
   const catsKey = cats.map((c) => c.id).join(",");
@@ -72,12 +72,6 @@ function QuickAddSheet({
     setOrderIds(ids);
   }, [catsKey]);
 
-  useEffect(() => {
-    return () => {
-      if (longPressRef.current) window.clearTimeout(longPressRef.current);
-    };
-  }, []);
-
   const orderedCats = orderIds.map((id) => cats.find((c) => c.id === id)).filter(Boolean) as Category[];
 
   const setOrder = (updater: (prev: string[]) => string[]) => {
@@ -88,54 +82,82 @@ function QuickAddSheet({
     });
   };
 
+  function resetDragVisuals() {
+    const drag = dragStateRef.current;
+    const list = listRef.current;
+    if (list && drag) {
+      const row = list.children[drag.startIndex] as HTMLElement | undefined;
+      if (row) row.style.transform = "";
+    }
+    if (indicatorRef.current) indicatorRef.current.style.opacity = "0";
+  }
+
   function handleGripPointerDown(e: ReactPointerEvent<HTMLButtonElement>, cat: Category) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    if (longPressRef.current) window.clearTimeout(longPressRef.current);
-    longPressRef.current = window.setTimeout(() => {
-      longPressRef.current = null;
-      movedRef.current = false;
-      setDraggingId(cat.id);
-    }, 280);
+    const list = listRef.current;
+    if (!list) return;
+    const rect = list.getBoundingClientRect();
+    const startIndex = orderIds.indexOf(cat.id);
+    dragStateRef.current = {
+      id: cat.id,
+      startIndex,
+      startContentY: e.clientY - rect.top + list.scrollTop,
+      target: startIndex,
+    };
+    setDraggingId(cat.id);
   }
 
   function handleGripPointerMove(e: ReactPointerEvent<HTMLButtonElement>) {
-    if (!draggingId) return;
+    const drag = dragStateRef.current;
+    if (!drag) return;
     const list = listRef.current;
     if (!list || list.children.length < 2) return;
     e.preventDefault();
     const rect = list.getBoundingClientRect();
-    if (e.clientY < rect.top + 28) list.scrollTop -= 12;
-    else if (e.clientY > rect.bottom - 28) list.scrollTop += 12;
+    if (e.clientY < rect.top + 24) list.scrollTop -= 12;
+    else if (e.clientY > rect.bottom - 24) list.scrollTop += 12;
     const contentY = e.clientY - rect.top + list.scrollTop;
-    let target = list.children.length - 1;
-    for (let i = 0; i < list.children.length; i++) {
-      const rowEl = list.children[i] as HTMLElement;
-      if (contentY < rowEl.offsetTop + rowEl.offsetHeight / 2) {
-        target = i;
+    const rows = Array.from(list.children) as HTMLElement[];
+    const draggedRow = rows[drag.startIndex];
+    if (draggedRow) draggedRow.style.transform = "translateY(" + (contentY - drag.startContentY) + "px)";
+    let insertBefore = rows.length;
+    for (let i = 0; i < rows.length; i++) {
+      if (i === drag.startIndex) continue;
+      if (contentY < rows[i].offsetTop + rows[i].offsetHeight / 2) {
+        insertBefore = i;
         break;
       }
     }
-    setOrder((prev) => {
-      const from = prev.indexOf(draggingId);
-      if (from === -1 || from === target) return prev;
-      movedRef.current = true;
-      const next = [...prev];
-      next.splice(from, 1);
-      next.splice(target, 0, draggingId);
-      return next;
-    });
+    drag.target = insertBefore > drag.startIndex ? insertBefore - 1 : insertBefore;
+    const indicator = indicatorRef.current;
+    if (indicator) {
+      const last = rows[rows.length - 1];
+      const lineY = insertBefore === rows.length ? last.offsetTop + last.offsetHeight : rows[insertBefore].offsetTop;
+      const top = Math.max(0, Math.min(lineY - list.scrollTop, list.clientHeight - 3));
+      indicator.style.top = top + "px";
+      indicator.style.opacity = "1";
+    }
   }
 
   function handleGripPointerUp() {
-    if (longPressRef.current) {
-      window.clearTimeout(longPressRef.current);
-      longPressRef.current = null;
+    const drag = dragStateRef.current;
+    if (drag && drag.target !== drag.startIndex) {
+      const next = [...orderIds];
+      const [moved] = next.splice(drag.startIndex, 1);
+      next.splice(drag.target, 0, moved);
+      setOrder(() => next);
+      void onReorderCategories(next);
     }
-    if (draggingId && movedRef.current) {
-      void onReorderCategories(orderStateRef.current);
-    }
+    resetDragVisuals();
+    dragStateRef.current = null;
+    setDraggingId(null);
+  }
+
+  function handleGripPointerCancel() {
+    resetDragVisuals();
+    dragStateRef.current = null;
     setDraggingId(null);
   }
 
@@ -363,6 +385,11 @@ function QuickAddSheet({
                 <X size={13} color="var(--text-muted)" />
               </button>
             </div>
+            {!form && (
+              <p className="mb-2" style={{ color: "var(--text-faint)", fontSize: 10 }}>
+                Seret ikon ⠿ untuk mengurutkan.
+              </p>
+            )}
             {form ? (
               <>
                 <p style={{ color: "var(--text-muted)", fontSize: 10.5, fontWeight: 600 }} className="mb-1.5">
@@ -474,17 +501,28 @@ function QuickAddSheet({
               <>
                 <div
                   ref={listRef}
-                  className="flex flex-col gap-1 mb-2.5 max-h-52 overflow-y-auto pr-0.5"
+                  className="relative flex flex-col gap-1 mb-2.5 max-h-52 overflow-y-auto pr-0.5"
                   style={{ touchAction: draggingId ? "none" : undefined }}
                 >
+                  <div
+                    ref={indicatorRef}
+                    className="pointer-events-none absolute left-1 right-1 z-20 rounded-full"
+                    style={{
+                      height: 3,
+                      top: 0,
+                      opacity: 0,
+                      background: "color-mix(in srgb, var(--blue) 70%, transparent)",
+                    }}
+                  />
                   {orderedCats.map((c) => {
                     const Icon = ICON_MAP[c.icon] || MoreHorizontal;
                     const confirmed = confirmDeleteId === c.id;
                     return (
                       <div
                         key={c.id}
-                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg"
+                        className="relative flex items-center gap-2 px-2 py-1.5 rounded-lg"
                         style={{
+                          zIndex: draggingId === c.id ? 12 : undefined,
                           background:
                             draggingId === c.id
                               ? "color-mix(in srgb, var(--blue) 10%, var(--bg-app))"
@@ -496,10 +534,11 @@ function QuickAddSheet({
                         <button
                           type="button"
                           aria-label={"Urutkan kategori " + c.label}
+                          aria-grabbed={draggingId === c.id}
                           onPointerDown={(e) => handleGripPointerDown(e, c)}
                           onPointerMove={handleGripPointerMove}
                           onPointerUp={handleGripPointerUp}
-                          onPointerCancel={handleGripPointerUp}
+                          onPointerCancel={handleGripPointerCancel}
                           onContextMenu={(e) => e.preventDefault()}
                           className="flex items-center justify-center flex-shrink-0 p-1 rounded"
                           style={{

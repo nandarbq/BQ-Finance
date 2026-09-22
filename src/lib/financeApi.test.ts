@@ -622,18 +622,16 @@ describe("financeApi - categories", () => {
     expect(result.familyId).toBe("fam1");
   });
 
-  it("reorderCategories upserts sequential sort_order for ids", async () => {
+  it("reorderCategories updates each category with sequential sort_order", async () => {
     setupChain({ data: null, error: null });
     await reorderCategories(["c3", "c1", "c2"]);
 
-    expect(supabase.upsert).toHaveBeenCalledWith(
-      [
-        { id: "c3", sort_order: 1 },
-        { id: "c1", sort_order: 2 },
-        { id: "c2", sort_order: 3 },
-      ],
-      { onConflict: "id" }
-    );
+    expect(supabase.update).toHaveBeenCalledWith({ sort_order: 1 });
+    expect(supabase.update).toHaveBeenCalledWith({ sort_order: 2 });
+    expect(supabase.update).toHaveBeenCalledWith({ sort_order: 3 });
+    expect(supabase.eq).toHaveBeenCalledWith("id", "c3");
+    expect(supabase.eq).toHaveBeenCalledWith("id", "c1");
+    expect(supabase.eq).toHaveBeenCalledWith("id", "c2");
   });
 
   it("updateCategory sends label, icon, and color", async () => {
