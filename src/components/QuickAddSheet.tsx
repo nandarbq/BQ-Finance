@@ -54,6 +54,7 @@ function QuickAddSheet({
   const [showCalendar, setShowCalendar] = useState(false);
   const amount = parseInt(amountStr || "0", 10);
   const cats = categories.filter((c) => c.type === type);
+  const prevTypeRef = useRef(type);
 
   const [orderIds, setOrderIds] = useState<string[]>([]);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -207,6 +208,8 @@ function QuickAddSheet({
   }
 
   useEffect(() => {
+    if (prevTypeRef.current === type) return;
+    prevTypeRef.current = type;
     setCategory(null);
     setManaging(false);
     setForm(null);
