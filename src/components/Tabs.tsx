@@ -545,6 +545,8 @@ function TabTransaksi({
           periodLabel: periodLabel(),
           displayName,
           categories,
+          filterType: filter,
+          searchQuery: query,
         }),
         new Promise((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error("timeout")), 20000);
