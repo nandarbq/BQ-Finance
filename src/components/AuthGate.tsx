@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
@@ -20,30 +20,55 @@ export default function AuthGate({ children }: AuthGateProps) {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [connError, setConnError] = useState("");
 
-  useEffect(() => {
-    let active = true;
+  const readSession = useCallback(() => {
+    setChecking(true);
+    setError("");
+    setConnError("");
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        if (!active) return;
         setSession(data.session);
+        setChecking(false);
       })
       .catch(() => {
-        if (!active) return;
-        setError("Gagal terhubung ke server. Periksa koneksi internetmu lalu coba lagi.");
-      })
-      .finally(() => {
-        if (active) setChecking(false);
+        // Gagal membaca session BUKAN berarti belum login. Jangan tampilkan
+        // form login di sini, karena itu membuat user mengira session-nya hilang.
+        setChecking(false);
+        setConnError("Gagal terhubung ke server. Periksa koneksi internetmu lalu coba lagi.");
       });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
-    });
-    return () => {
-      active = false;
-      listener.subscription.unsubscribe();
-    };
   }, []);
+
+  useEffect(() => {
+    readSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, s) => {
+      // INITIAL_SESSION mengulang hasil getSession() di atas; abaikan supaya
+      // tidak ada balapan yang menimpa session yang sah dengan null.
+      if (event === "INITIAL_SESSION") return;
+      if (s) {
+        setSession(s);
+        return;
+      }
+      // null hanya berarti keluar kalau itu SIGNED_OUT eksplisit.
+      // Event lain (mis. refresh gagal sementara) tidak boleh mengeluarkan user.
+      if (event === "SIGNED_OUT") setSession(null);
+    });
+
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      // Di PWA iOS timer auto-refresh dibekukan saat background, jadi token bisa
+      // keburu kedaluwarsa. Panaskan lagi sebelum user melakukan sesuatu.
+      supabase.auth.refreshSession().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      listener.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [readSession]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -129,6 +154,49 @@ export default function AuthGate({ children }: AuthGateProps) {
             className="bqfinance-logo-breathe"
             style={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (connError && !session) {
+    return (
+      <div
+        className="min-h-screen w-full flex items-center justify-center px-5"
+        style={{ background: "var(--bg-page)" }}
+      >
+        <div className="w-full text-center" style={{ maxWidth: 340 }}>
+          <div
+            className="mx-auto mb-4 flex items-center justify-center"
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 20,
+              background: "var(--bg-surface)",
+              boxShadow: "0 12px 40px var(--shadow)",
+            }}
+          >
+            <img src={logoUrl} alt="BQ Finance" style={{ width: "70%", height: "70%", objectFit: "contain" }} />
+          </div>
+          <p
+            style={{
+              fontFamily: "'Sora', sans-serif",
+              color: "var(--text-primary)",
+              fontWeight: 700,
+              fontSize: 15,
+              marginBottom: 6,
+            }}
+          >
+            Belum bisa terhubung
+          </p>
+          <p style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 16 }}>{connError}</p>
+          <button
+            onClick={readSession}
+            className="w-full py-3 rounded-2xl"
+            style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 13, fontWeight: 700 }}
+          >
+            Coba lagi
+          </button>
         </div>
       </div>
     );
