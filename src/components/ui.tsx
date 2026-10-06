@@ -7,16 +7,37 @@ interface AvatarProps {
   color: string;
   size?: number;
   ring?: boolean;
+  /** URL foto profil. Kalau ada, tampil foto; kalau tidak, tetap inisial. */
+  src?: string | null;
+  innerId?: string;
 }
 
-function Avatar({ name, color, size = 32, ring = false }: AvatarProps) {
+function Avatar({ name, color, size = 32, ring = false, src, innerId }: AvatarProps) {
+  const base: CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: "999px",
+    flexShrink: 0,
+    boxShadow: ring ? "0 0 0 2px var(--bg-app), 0 0 0 4px " + color : "none",
+  };
+
+  if (src) {
+    return (
+      <img
+        key={innerId}
+        src={src}
+        alt={name || "Foto profil"}
+        referrerPolicy="no-referrer"
+        style={{ ...base, objectFit: "cover" }}
+      />
+    );
+  }
+
   const initial = (name || "?").trim().charAt(0).toUpperCase();
   return (
     <div
       style={{
-        width: size,
-        height: size,
-        borderRadius: "999px",
+        ...base,
         background: color,
         display: "flex",
         alignItems: "center",
@@ -25,8 +46,6 @@ function Avatar({ name, color, size = 32, ring = false }: AvatarProps) {
         fontWeight: 700,
         fontSize: size * 0.42,
         fontFamily: "'Sora', sans-serif",
-        boxShadow: ring ? "0 0 0 2px var(--bg-app), 0 0 0 4px " + color : "none",
-        flexShrink: 0,
       }}
     >
       {initial}

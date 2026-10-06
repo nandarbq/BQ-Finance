@@ -1,9 +1,19 @@
 import { useState, useEffect, useRef } from "react";
-import type { TxType } from "./types";
+import type { Member, TxType } from "./types";
 
 export function nameFromEmail(email: string): string {
   const base = (email || "").split("@")[0] || "Pengguna";
   return base.charAt(0).toUpperCase() + base.slice(1);
+}
+
+/**
+ * Nama yang ditampilkan untuk label anggota di tabel members.
+ * Kalau labelnya tertaut ke akun family_members, pakai nama profil akun itu
+ * supaya ikut berubah saat pemiliknya mengganti nama. Kalau belum tertaut,
+ * pakai nama label bebas seperti biasa.
+ */
+export function memberLabelName(member: Member): string {
+  return member.displayName || member.name;
 }
 
 export function toISO(d: Date): string {

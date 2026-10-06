@@ -32,6 +32,7 @@ import {
   Crown,
   Eye,
   EyeOff,
+  Link2,
 } from "lucide-react";
 import { toast } from "./Toast";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
@@ -51,6 +52,7 @@ import {
   useCountUp,
   useDebouncedValue,
   nameFromEmail,
+  memberLabelName,
 } from "../lib/appUtils";
 import { getCatMeta, ICON_MAP, MEMBER_COLORS } from "../lib/categoryMeta";
 import { Avatar, EmptyState, ProfileAvatar } from "./ui";
@@ -410,7 +412,7 @@ function TabBeranda({
                     </p>
                     <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>
                       {formatDateShort(t.date)}
-                      {member ? " - " + member.name : ""}
+                      {member ? " - " + memberLabelName(member) : ""}
                     </p>
                   </div>
                   <span
@@ -491,7 +493,7 @@ function TabTransaksi({
         const note = (t.note || "").toLowerCase();
         const catLabel = getCatMeta(categories, t.type, t.category).label.toLowerCase();
         const amount = String(Math.round(t.amount)).toLowerCase();
-        const memberName = member ? member.name.toLowerCase() : "";
+        const memberName = member ? memberLabelName(member).toLowerCase() : "";
         return note.includes(q) || catLabel.includes(q) || amount.includes(q) || memberName.includes(q);
       });
     }
@@ -766,7 +768,7 @@ function TabTransaksi({
                         {meta.label}
                       </p>
                       <p style={{ color: "var(--text-muted)", fontSize: 10.5 }} className="truncate">
-                        {t.note ? t.note : member ? member.name : "\u00A0"}
+                        {t.note ? t.note : member ? memberLabelName(member) : "\u00A0"}
                       </p>
                       {mode === "keluarga" && adderName && (
                         <p style={{ color: "var(--text-faint)", fontSize: 10 }} className="truncate">
@@ -1109,6 +1111,8 @@ interface TabPengaturanProps {
   onLeaveFamily: () => void | Promise<void>;
   onRemoveMember: (userId: string) => void | Promise<void>;
   onRefreshFamily: () => void | Promise<void>;
+  onLinkMember: (id: string) => void | Promise<void>;
+  onUnlinkMember: (id: string) => void | Promise<void>;
 }
 
 function TabPengaturan({
@@ -1138,6 +1142,8 @@ function TabPengaturan({
   onLeaveFamily,
   onRemoveMember,
   onRefreshFamily,
+  onLinkMember,
+  onUnlinkMember,
 }: TabPengaturanProps) {
   const [showAddMember, setShowAddMember] = useState(false);
   const [name, setName] = useState("");
@@ -1156,6 +1162,25 @@ function TabPengaturan({
   const [joining, setJoining] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [familyRefreshing, setFamilyRefreshing] = useState(false);
+  const [linkingMemberId, setLinkingMemberId] = useState<string | null>(null);
+
+  async function handleLink(m: Member) {
+    setLinkingMemberId(m.id);
+    try {
+      await onLinkMember(m.id);
+    } finally {
+      setLinkingMemberId(null);
+    }
+  }
+
+  async function handleUnlink(m: Member) {
+    setLinkingMemberId(m.id);
+    try {
+      await onUnlinkMember(m.id);
+    } finally {
+      setLinkingMemberId(null);
+    }
+  }
 
   const memberTotals = useMemo(
     () =>
@@ -1912,15 +1937,51 @@ function TabPengaturan({
           <div className="flex flex-col gap-2">
             {memberTotals.map((m) => {
               const isConfirmMember = confirmMemberId === m.id;
+              const linkedToMe = m.linkedUserId === userId;
+              const linkedToOther = !!m.linkedUserId && !linkedToMe;
+              const isLinking = linkingMemberId === m.id;
               return (
                 <div key={m.id} className="flex items-center gap-2.5">
-                  <Avatar name={m.name} color={m.color} size={30} />
+                  <Avatar name={memberLabelName(m)} color={m.color} size={30} src={m.avatarUrl} innerId={"mem-" + m.id} />
                   <div className="flex-1 min-w-0">
-                    <p style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }} className="truncate">
-                      {m.name}
+                    <p
+                      style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }}
+                      className="truncate flex items-center gap-1.5"
+                    >
+                      <span className="truncate">{memberLabelName(m)}</span>
+                      {m.linkedUserId && (
+                        <span
+                          className="flex-shrink-0"
+                          style={{
+                            background: "var(--bg-muted)",
+                            color: "var(--text-muted)",
+                            fontSize: 9,
+                            fontWeight: 700,
+                            padding: "1px 5px",
+                            borderRadius: 999,
+                          }}
+                        >
+                          {linkedToMe ? "AKUNMU" : "TERTAUT"}
+                        </span>
+                      )}
                     </p>
                     <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Pengeluaran: {formatRupiah(m.spent)}</p>
                   </div>
+
+                  {!m.builtIn && !linkedToOther && !isConfirmMember && (
+                    <button
+                      onClick={() => (linkedToMe ? handleUnlink(m) : handleLink(m))}
+                      disabled={isLinking}
+                      className="p-1.5 flex items-center"
+                      title={linkedToMe ? "Lepas dari akunmu" : "Tautkan ke akunmu"}
+                    >
+                      {isLinking ? (
+                        <Loader2 size={13} color="var(--text-faint)" className="animate-spin" />
+                      ) : (
+                        <Link2 size={13} color={linkedToMe ? "var(--blue)" : "var(--text-faint)"} />
+                      )}
+                    </button>
+                  )}
                   {!m.builtIn && !isConfirmMember && (
                     <button onClick={() => setConfirmMemberId(m.id)} className="p-1.5">
                       <Trash2 size={13} color="var(--text-faint)" />

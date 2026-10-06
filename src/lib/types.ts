@@ -56,6 +56,11 @@ export interface Member {
   color: string;
   builtIn: boolean;
   familyId: string | null;
+  /** Akun family_members yang di-tautkan ke label ini; null kalau label bebas. */
+  linkedUserId: string | null;
+  /** Nama & foto profil akun tertaut, disalin otomatis oleh trigger DB. */
+  displayName: string | null;
+  avatarUrl: string | null;
 }
 
 export interface Budget {

@@ -16,7 +16,7 @@ import {
   PieChart as PieIcon,
   FileDown,
 } from "lucide-react";
-import { todayISO, formatDateShort, nameFromEmail } from "../lib/appUtils";
+import { todayISO, formatDateShort, nameFromEmail, memberLabelName } from "../lib/appUtils";
 import { formatRupiah } from "../lib/format";
 import { getCatMeta } from "../lib/categoryMeta";
 import type { Category, FamilyState, Member, Transaction } from "../lib/types";
@@ -382,8 +382,8 @@ function TxDetailSheet({ tx, members, family, onClose, onEdit, onDelete, categor
             >
               <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Anggota</span>
               <span className="flex items-center gap-1.5">
-                <Avatar name={member.name} color={member.color} size={18} />
-                <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{member.name}</span>
+                <Avatar name={memberLabelName(member)} color={member.color} size={18} src={member.avatarUrl} innerId={"mem-" + member.id} />
+                <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{memberLabelName(member)}</span>
               </span>
             </div>
           )}

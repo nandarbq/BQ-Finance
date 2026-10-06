@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import { autoTable } from "jspdf-autotable";
 import logoDataUrl from "../assets/logo bq-finance.png?inline";
 import { formatRupiah } from "./format";
+import { memberLabelName } from "./appUtils";
 import type { Category, Member, Mode, Transaction, TxType } from "./types";
 
 const CAT_LABELS: Record<TxType, Record<string, string>> = {
@@ -68,7 +69,7 @@ export async function exportTransactionPdf({
 
   const memberName = (id: string | null): string => {
     const m = members.find((x) => x.id === id);
-    return m ? m.name : "";
+    return m ? memberLabelName(m) : "";
   };
 
   const income = transactions.filter((t) => t.type === "in").reduce((s, t) => s + t.amount, 0);

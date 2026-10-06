@@ -51,10 +51,22 @@ interface MemberRow {
   color: string;
   built_in: boolean;
   family_id: string | null;
+  linked_user_id?: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
 }
 
 function rowToMember(row: MemberRow): Member {
-  return { id: row.id, name: row.name, color: row.color, builtIn: row.built_in, familyId: row.family_id };
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    builtIn: row.built_in,
+    familyId: row.family_id,
+    linkedUserId: row.linked_user_id ?? null,
+    displayName: row.display_name ?? null,
+    avatarUrl: row.avatar_url ?? null,
+  };
 }
 
 interface BudgetRow {
@@ -188,6 +200,61 @@ export async function updateMyFamilyAvatar(avatarUrl: string | null): Promise<vo
 
 export async function updateMyFamilyName(name: string): Promise<void> {
   const { error } = await supabase.rpc("update_my_family_name", { target_name: name });
+  if (error) throw error;
+}
+
+/* ================================ Profile avatars ================================ */
+
+const AVATAR_BUCKET = "avatars";
+
+function avatarPath(userId: string): string {
+  return `${userId}/avatar.jpg`;
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const sep = dataUrl.indexOf(",");
+  if (sep < 0 || !dataUrl.startsWith("data:")) throw new Error("Gambar tidak valid");
+  const header = dataUrl.slice(0, sep);
+  const body = dataUrl.slice(sep + 1);
+  const mime = header.slice(5, header.indexOf(";")) || "image/jpeg";
+  const binary = header.endsWith(";base64") ? atob(body) : decodeURIComponent(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+/**
+ * Upload foto profil ke Supabase Storage dan kembalikan URL publiknya.
+ * Simpan URL-nya (bukan base64) di family_members.avatar_url supaya payload
+ * realtime tetap kecil: base64 512x512 bisa 60-120 KB per baris.
+ */
+export async function uploadProfileAvatar(userId: string, dataUrl: string): Promise<string> {
+  const blob = dataUrlToBlob(dataUrl);
+  const path = avatarPath(userId);
+  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(path, blob, {
+    contentType: "image/jpeg",
+    upsert: true,
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  if (!data?.publicUrl) throw new Error("Gagal membuat URL foto profil");
+  return data.publicUrl;
+}
+
+export async function deleteProfileAvatar(userId: string): Promise<void> {
+  const { error } = await supabase.storage.from(AVATAR_BUCKET).remove([avatarPath(userId)]);
+  if (error) throw error;
+}
+
+/* ================================ Member account linking ================================ */
+
+export async function linkMemberToAccount(memberId: string): Promise<void> {
+  const { error } = await supabase.rpc("link_member_to_account", { target_member_id: memberId });
+  if (error) throw error;
+}
+
+export async function unlinkMemberFromAccount(memberId: string): Promise<void> {
+  const { error } = await supabase.rpc("unlink_member_from_account", { target_member_id: memberId });
   if (error) throw error;
 }
 

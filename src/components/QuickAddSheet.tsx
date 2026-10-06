@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ChangeEvent, PointerEvent as ReactPointerEvent } from "react";
 import { X, Pencil, Plus, MoreHorizontal, Trash2, Check, Calendar, GripVertical } from "lucide-react";
-import { todayISO, formatDateShort } from "../lib/appUtils";
+import { todayISO, formatDateShort, memberLabelName } from "../lib/appUtils";
 import { ICON_MAP, CATEGORY_COLORS } from "../lib/categoryMeta";
 import type { Category, CategoryDraft, Member, Mode, Transaction, TransactionDraft, TxType } from "../lib/types";
 import { Avatar } from "./ui";
@@ -700,7 +700,7 @@ function QuickAddSheet({
                   onClick={() => setMemberId(m.id)}
                   className="flex flex-col items-center gap-1.5 flex-shrink-0"
                 >
-                  <Avatar name={m.name} color={m.color} size={34} ring={memberId === m.id} />
+                  <Avatar name={memberLabelName(m)} color={m.color} size={34} ring={memberId === m.id} src={m.avatarUrl} innerId={"mem-" + m.id} />
                   <span
                     className="truncate"
                     style={{
@@ -711,7 +711,7 @@ function QuickAddSheet({
                       lineHeight: 1.2,
                     }}
                   >
-                    {m.name}
+                    {memberLabelName(m)}
                   </span>
                 </button>
               ))}

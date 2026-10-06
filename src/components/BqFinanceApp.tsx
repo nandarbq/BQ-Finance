@@ -32,6 +32,10 @@ import {
   removeFamilyMember,
   updateMyFamilyAvatar,
   updateMyFamilyName,
+  uploadProfileAvatar,
+  deleteProfileAvatar,
+  linkMemberToAccount,
+  unlinkMemberFromAccount,
 } from "../lib/financeApi";
 import { nameFromEmail } from "../lib/appUtils";
 import type {
@@ -76,6 +80,18 @@ function dedupeCategoriesWith(rows: Category[]): Category[] {
   return Array.from(map.values());
 }
 
+function profileKeys(userId: string) {
+  return {
+    name: "bqfinance_name_" + userId,
+    avatar: "bqfinance_avatar_" + userId,
+    // Penanda "perubahan ini belum sampai ke server". Tanpa ini, hydrate akan
+    // menimpa input pengguna dengan nilai server yang lama begitu penulisan
+    // gagal — persis gejala yang dilaporkan (nama/foto balik lagi).
+    pendingName: "bqfinance_pending_name_" + userId,
+    pendingAvatar: "bqfinance_pending_avatar_" + userId,
+  };
+}
+
 export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const userId = session.user.id;
   const userEmail = session.user.email || "";
@@ -115,6 +131,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pullRef = useRef<number | null>(null);
+  const autoPushedRef = useRef<{ name?: string; avatarUrl?: string | null }>({});
 
   const isStandalone =
     typeof window !== "undefined" &&
@@ -122,6 +139,117 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       window.matchMedia("(display-mode: minimal-ui)").matches ||
       window.matchMedia("(display-mode: fullscreen)").matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone);
+
+  function cacheLocal(key: string, value: string) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      // Kuota localStorage penuh (foto besar) atau storage diblokir.
+      // Abaikan saja: server tetap sumber kebenaran.
+    }
+  }
+
+  function clearLocal(key: string) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // abaikan
+    }
+  }
+
+  /**
+   * Server adalah sumber kebenaran untuk nama & foto profil sendiri; localStorage
+   * hanya cache offline. Tanpa ini, nilai yang benar-benar ada di server akan
+   * tertimpa default begitu localStorage kosong (ganti perangkat, ganti origin,
+   * atau storage iOS di-evict).
+   *
+   * Kecuali: bila ada penanda pending, nilai lokal menang dan dicoba dikirim ulang.
+   */
+  const hydrateOwnProfile = useCallback(
+    (fam: FamilyState | null, opts?: { force?: boolean }) => {
+      if (!fam) return;
+      const self = fam.members.find((m) => m.userId === userId);
+      if (!self) return;
+
+      const k = profileKeys(userId);
+      const localName = localStorage.getItem(k.name) || "";
+      const localAvatar = localStorage.getItem(k.avatar) || null;
+      const serverName = (self.displayName || "").trim();
+      const serverAvatar = self.avatarUrl || null;
+      const force = opts?.force === true;
+
+      // undefined = tidak ada yang tertunda, null = tertunda hapus foto.
+      const rawPendingName = localStorage.getItem(k.pendingName);
+      const rawPendingAvatar = localStorage.getItem(k.pendingAvatar);
+      let pendingName: string | null | undefined;
+      let pendingAvatar: string | null | undefined;
+      try {
+        pendingName = rawPendingName === null ? undefined : JSON.parse(rawPendingName);
+      } catch {
+        pendingName = undefined;
+      }
+      try {
+        pendingAvatar = rawPendingAvatar === null ? undefined : JSON.parse(rawPendingAvatar);
+      } catch {
+        pendingAvatar = undefined;
+      }
+
+      const tryPushName = (value: string) => {
+        if (!force && autoPushedRef.current.name === value) return;
+        autoPushedRef.current.name = value;
+        updateMyFamilyName(value)
+          .then(() => clearLocal(k.pendingName))
+          .catch(() =>
+            toast.error("Nama belum tersimpan di server. Tarik-turun layar untuk mencoba lagi.")
+          );
+      };
+
+      const tryPushAvatar = (value: string | null) => {
+        if (!force && autoPushedRef.current.avatarUrl === value) return;
+        autoPushedRef.current.avatarUrl = value;
+        updateMyFamilyAvatar(value)
+          .then(() => clearLocal(k.pendingAvatar))
+          .catch(() =>
+            toast.error("Foto belum tersimpan di server. Tarik-turun layar untuk mencoba lagi.")
+          );
+      };
+
+      if (pendingName !== undefined && pendingName !== null && pendingName !== serverName) {
+        setDisplayName(pendingName);
+        tryPushName(pendingName);
+      } else if (serverName) {
+        setDisplayName(serverName);
+        autoPushedRef.current.name = serverName;
+        if (pendingName !== undefined) clearLocal(k.pendingName);
+        if (serverName !== localName) cacheLocal(k.name, serverName);
+      } else if (localName) {
+        setDisplayName(localName);
+      }
+
+      if (pendingAvatar !== undefined && pendingAvatar !== serverAvatar) {
+        setAvatar(pendingAvatar);
+        tryPushAvatar(pendingAvatar);
+      } else if (serverAvatar) {
+        setAvatar(serverAvatar);
+        autoPushedRef.current.avatarUrl = serverAvatar;
+        if (pendingAvatar !== undefined) clearLocal(k.pendingAvatar);
+        if (serverAvatar !== localAvatar) cacheLocal(k.avatar, serverAvatar);
+      } else {
+        // Server kosong: pertahankan apa adanya (bisa null bila memang dihapus).
+        // Jangan sentuh autoPushedRef di sini — tryPushAvatar-lah yang menandainya.
+        setAvatar(localAvatar);
+        if (pendingAvatar !== undefined) clearLocal(k.pendingAvatar);
+      }
+
+      // Server belum punya nilai tapi kita punya nilai lokal (mis. sedang offline
+      // saat mengganti nama, atau baru gabung keluarga). Coba kirim supaya anggota
+      // lain ikut melihat. Dicatat sebelum dipanggil supaya polling latar belakang
+      // tidak menumpuk kegagalan; tarik-turun layar meresetnya untuk mencoba lagi.
+      if (pendingName === undefined && !serverName && localName) tryPushName(localName);
+      if (pendingAvatar === undefined && !serverAvatar && localAvatar) tryPushAvatar(localAvatar);
+    },
+    [userId]
+  );
 
   const loadData = useCallback(async () => {
     try {
@@ -149,6 +277,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       setBudgets(bdgt);
       setCategories(cats);
       setFamilyCategories(famCats);
+      hydrateOwnProfile(fam, { force: true });
       setLoadError("");
       return true;
     } catch (e) {
@@ -156,7 +285,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       setLoadError("Gagal memuat data. Periksa koneksi atau konfigurasi Supabase.");
       return false;
     }
-  }, [userId]);
+  }, [userId, hydrateOwnProfile]);
 
   useEffect(() => {
     let mounted = true;
@@ -189,10 +318,11 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       }
       setFamily(fam);
       setJoinCode(code);
+      hydrateOwnProfile(fam);
     } catch (e) {
       console.error(e);
     }
-  }, []);
+  }, [hydrateOwnProfile]);
 
   const familyRefreshBusy = useRef(false);
   useEffect(() => {
@@ -213,6 +343,19 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
 
   const familyId = family?.family.id ?? null;
   const displayCategories = mode === "keluarga" ? familyCategories : categories;
+
+  // Dipisah dari refreshFamily supaya kegagalan memuat label anggota tidak
+  // ikut menggagalkan pembaruan data keluarga, dan tiap realtime event hanya
+  // memuat ulang tabel yang benar-benar berubah.
+  const refreshMemberLabels = useCallback(async () => {
+    try {
+      const mem = await fetchMembers(userId, familyId);
+      setMembers(mem);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [userId, familyId]);
+
   useEffect(() => {
     if (!familyId) return;
     let channel: ReturnType<typeof supabase.channel> | null = null;
@@ -224,14 +367,40 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
           { event: "*", schema: "public", table: "family_members", filter: "family_id=eq." + familyId },
           () => refreshFamily()
         )
-        .subscribe(() => {});
+        // Tabel members ikut didengarkan supaya label anggota yang tertaut ke
+        // akun ikut ter-update live di perangkat anggota lain.
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "members", filter: "family_id=eq." + familyId },
+          () => refreshMemberLabels()
+        )
+        .subscribe((status) => {
+          // Dulu status dibuang, jadi kegagalan subscribe tidak pernah terlihat
+          // dan anggota lain hanya melihat perubahan lewat polling tab Pengaturan.
+          if (status === "SUBSCRIBED") return;
+          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+            toast.error("Sinkronisasi keluarga terputus. Perubahan mungkin belum terlihat di perangkat lain.");
+          }
+        });
     } catch (e) {
       console.error("realtime subscribe failed:", e);
     }
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
-  }, [familyId, refreshFamily]);
+  }, [familyId, refreshFamily, refreshMemberLabels]);
+
+  // Realtime bisa gagal saat perangkat lama tertidur. Saat kembali terlihat,
+  // ambil data terbaru supaya tidak menampilkan profil yang sudah basi.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      refreshFamily();
+      refreshMemberLabels();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refreshFamily, refreshMemberLabels]);
 
   const onPullStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
@@ -448,6 +617,26 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     [members]
   );
 
+  const handleLinkMember = useCallback(async (id: string) => {
+    try {
+      await linkMemberToAccount(id);
+      await refreshMemberLabels();
+      toast.success("Anggota ditautkan ke akunmu.");
+    } catch {
+      toast.error("Gagal menautkan anggota. Coba lagi.");
+    }
+  }, [refreshMemberLabels]);
+
+  const handleUnlinkMember = useCallback(async (id: string) => {
+    try {
+      await unlinkMemberFromAccount(id);
+      await refreshMemberLabels();
+      toast.success("Tautan anggota dilepas.");
+    } catch {
+      toast.error("Gagal melepas tautan. Coba lagi.");
+    }
+  }, [refreshMemberLabels]);
+
   const handleSaveBudget = useCallback(
     async (category: string, amount: number) => {
       if (!category || !amount || amount <= 0) return;
@@ -564,13 +753,27 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     [mode, family]
   );
 
+  const pushProfileToFamily = useCallback(() => {
+    const k = profileKeys(userId);
+    cacheLocal(k.pendingName, JSON.stringify(displayName));
+    cacheLocal(k.pendingAvatar, JSON.stringify(avatar));
+    return Promise.all([
+      updateMyFamilyName(displayName),
+      updateMyFamilyAvatar(avatar),
+    ])
+      .then(() => {
+        clearLocal(k.pendingName);
+        clearLocal(k.pendingAvatar);
+      })
+      .catch(() =>
+        toast.error("Profil belum tersinkron ke keluarga. Tarik-turun layar untuk mencoba lagi.")
+      );
+  }, [displayName, avatar, userId]);
+
   const handleCreateFamily = useCallback(async () => {
     try {
       const fam = await createFamily();
-      await Promise.all([
-        updateMyFamilyName(displayName).catch((e) => console.error("sync family name:", e)),
-        updateMyFamilyAvatar(avatar).catch((e) => console.error("sync family avatar:", e)),
-      ]);
+      await pushProfileToFamily();
       await loadData();
       const code = await fetchJoinCode(fam.id);
       setJoinCode(code);
@@ -581,16 +784,13 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
       toast.error(errMsg(e));
       return false;
     }
-  }, [loadData, displayName, avatar]);
+  }, [loadData, pushProfileToFamily]);
 
   const handleJoinFamily = useCallback(
     async (code: string): Promise<boolean> => {
       try {
         const famId = await joinFamilyByCode(code.trim());
-        await Promise.all([
-          updateMyFamilyName(displayName).catch((e) => console.error("sync family name:", e)),
-          updateMyFamilyAvatar(avatar).catch((e) => console.error("sync family avatar:", e)),
-        ]);
+        await pushProfileToFamily();
         await loadData();
         const c = await fetchJoinCode(famId);
         setJoinCode(c);
@@ -602,7 +802,7 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
         return false;
       }
     },
-    [loadData, displayName, avatar]
+    [loadData, pushProfileToFamily]
   );
 
   const handleRegenerateCode = useCallback(async () => {
@@ -683,19 +883,60 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     reader.readAsDataURL(file);
   }
 
-  function handleCropConfirm(dataUrl: string) {
+  async function handleCropConfirm(dataUrl: string) {
+    const k = profileKeys(userId);
+    const prevAvatar = avatar;
+    // Tampilkan dulu supaya UI responsif, lalu unggah ke Storage.
     setAvatar(dataUrl);
-    localStorage.setItem("bqfinance_avatar_" + userId, dataUrl);
     syncFamilyAvatar(dataUrl);
-    updateMyFamilyAvatar(dataUrl).catch((e) => console.error("sync family avatar:", e));
     setCropSrc(null);
+
+    let url: string;
+    try {
+      url = await uploadProfileAvatar(userId, dataUrl);
+    } catch {
+      toast.error("Foto gagal diunggah. Cek koneksi lalu coba lagi.");
+      setAvatar(prevAvatar);
+      syncFamilyAvatar(prevAvatar);
+      return;
+    }
+
+    setAvatar(url);
+    syncFamilyAvatar(url);
+    cacheLocal(k.avatar, url);
+    // Tandai sebagai "belum sampai ke server" SEBELUM menulis, supaya hydrate
+    // berikutnya tidak menimpa foto baru ini dengan foto server yang lama.
+    cacheLocal(k.pendingAvatar, JSON.stringify(url));
+    autoPushedRef.current.avatarUrl = url;
+
+    try {
+      await updateMyFamilyAvatar(url);
+      clearLocal(k.pendingAvatar);
+    } catch {
+      toast.error("Foto tersimpan, tapi belum tersinkron ke keluarga. Tarik-turun layar untuk mencoba lagi.");
+    }
   }
 
-  function handleRemoveAvatar() {
+  async function handleRemoveAvatar() {
+    const k = profileKeys(userId);
     setAvatar(null);
-    localStorage.removeItem("bqfinance_avatar_" + userId);
     syncFamilyAvatar(null);
-    updateMyFamilyAvatar(null).catch((e) => console.error("sync family avatar:", e));
+    clearLocal(k.avatar);
+    cacheLocal(k.pendingAvatar, JSON.stringify(null));
+    autoPushedRef.current.avatarUrl = null;
+    // Kosongkan kolom dulu, baru hapus objek. Bila urutannya terbalik dan penulisan
+    // gagal, anggota lain akan melihat tautan foto yang sudah mati.
+    try {
+      await updateMyFamilyAvatar(null);
+      clearLocal(k.pendingAvatar);
+    } catch {
+      toast.error("Foto gagal dihapus di server. Tarik-turun layar untuk mencoba lagi.");
+    }
+    try {
+      await deleteProfileAvatar(userId);
+    } catch {
+      // Objek sisa tidak masalah; kolomnya sudah kosong.
+    }
   }
 
   function syncFamilyAvatar(avatarUrl: string | null) {
@@ -716,13 +957,21 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
   function handleNameChange(next: string) {
     const clean = (next || "").trim();
     const final = clean || nameFromEmail(userEmail);
+    const k = profileKeys(userId);
     setDisplayName(final);
-    localStorage.setItem("bqfinance_name_" + userId, final);
-    if (family) {
-      updateMyFamilyName(final)
-        .then(() => syncMyFamilyName(final))
-        .catch((e) => console.error("sync family name:", e));
-    }
+    cacheLocal(k.name, final);
+    // Tandai sebagai "belum sampai ke server", supaya hydrate tidak menimpa
+    // input pengguna dengan nama server yang lama bila penulisan gagal.
+    cacheLocal(k.pendingName, JSON.stringify(final));
+    autoPushedRef.current.name = final;
+    syncMyFamilyName(final);
+    // Tidak digate !family lagi: kalau family belum termuat, hydrateOwnProfile
+    // akan mengirim ulang nilai ini saat data keluarga tersedia.
+    updateMyFamilyName(final)
+      .then(() => clearLocal(k.pendingName))
+      .catch(() => {
+        toast.error("Nama belum tersimpan di server. Tarik-turun layar untuk mencoba lagi.");
+      });
   }
 
   function syncMyFamilyName(name: string) {
@@ -942,6 +1191,8 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
                   onLeaveFamily={handleLeaveFamily}
                   onRemoveMember={handleRemoveFamilyMember}
                   onRefreshFamily={refreshFamily}
+                  onLinkMember={handleLinkMember}
+                  onUnlinkMember={handleUnlinkMember}
                 />
               )}
             </div>

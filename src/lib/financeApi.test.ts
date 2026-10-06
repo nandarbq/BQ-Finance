@@ -21,7 +21,20 @@ vi.mock("./supabaseClient", () => {
     auth: {
       getUser: vi.fn(() => Promise.resolve({ data: { user: { id: "u1" } }, error: null })),
     },
+    storage: {
+      upload: vi.fn(() => Promise.resolve({ data: { path: "u1/avatar.jpg" }, error: null })),
+      remove: vi.fn(() => Promise.resolve({ data: [], error: null })),
+      getPublicUrl: vi.fn(() => ({
+        data: { publicUrl: "https://example.supabase.co/storage/v1/object/public/avatars/u1/avatar.jpg" },
+      })),
+    },
   };
+  const storageBucket = {
+    upload: chain.storage.upload,
+    remove: chain.storage.remove,
+    getPublicUrl: chain.storage.getPublicUrl,
+  };
+  chain.storage.from = vi.fn(() => storageBucket);
   ["select", "insert", "update", "upsert", "delete", "eq", "is", "order"].forEach((name) => {
     chain[name] = vi.fn(() => methods);
     methods[name] = chain[name];
@@ -61,6 +74,10 @@ import {
   leaveFamily,
   removeFamilyMember,
   updateMyFamilyAvatar,
+  uploadProfileAvatar,
+  deleteProfileAvatar,
+  linkMemberToAccount,
+  unlinkMemberFromAccount,
 } from "./financeApi";
 
 function setupChain(fetchResult, singleResult = fetchResult, maybeSingleResult = fetchResult) {
@@ -182,9 +199,9 @@ describe("financeApi - keluarga", () => {
 
   it("updateMyFamilyAvatar calls update_my_family_avatar rpc", async () => {
     setupChain({ data: null, error: null });
-    await updateMyFamilyAvatar("data:image/png;base64,xxx");
+    await updateMyFamilyAvatar("https://example.supabase.co/storage/v1/object/public/avatars/u1/avatar.jpg");
     expect(supabase.rpc).toHaveBeenCalledWith("update_my_family_avatar", {
-      target_avatar_url: "data:image/png;base64,xxx",
+      target_avatar_url: "https://example.supabase.co/storage/v1/object/public/avatars/u1/avatar.jpg",
     });
   });
 });
@@ -356,13 +373,37 @@ describe("financeApi - members", () => {
       color: "#4FB0A5",
       built_in: true,
     });
-    expect(result).toEqual([{ id: "m-bersama", name: "Bersama", color: "#4FB0A5", builtIn: true, familyId: "fam1" }]);
+    expect(result).toEqual([expect.objectContaining({ id: "m-bersama", name: "Bersama", builtIn: true, familyId: "fam1" })]);
+    expect(result[0]).toEqual(expect.objectContaining({ linkedUserId: null, displayName: null, avatarUrl: null }));
   });
 
   it("fetchMembers returns mapped members", async () => {
     setupChain({ data: [memberRow], error: null });
     const result = await fetchMembers("u1", "fam1");
-    expect(result).toEqual([{ id: "m1", name: "Ayah", color: "#ff0000", builtIn: false, familyId: "fam1" }]);
+    expect(result).toEqual([expect.objectContaining({ id: "m1", name: "Ayah", builtIn: false, familyId: "fam1" })]);
+    expect(result[0]).toEqual(expect.objectContaining({ linkedUserId: null, displayName: null, avatarUrl: null }));
+  });
+
+  it("fetchMembers maps linked account profile fields", async () => {
+    setupChain({
+      data: [
+        {
+          ...memberRow,
+          linked_user_id: "u-ayah",
+          display_name: "Dadang",
+          avatar_url: "https://example.supabase.co/storage/v1/object/public/avatars/u-ayah/avatar.jpg",
+        },
+      ],
+      error: null,
+    });
+    const result = await fetchMembers("u1", "fam1");
+    expect(result[0]).toEqual(
+      expect.objectContaining({
+        linkedUserId: "u-ayah",
+        displayName: "Dadang",
+        avatarUrl: "https://example.supabase.co/storage/v1/object/public/avatars/u-ayah/avatar.jpg",
+      })
+    );
   });
 
   it("insertMember returns the mapped member", async () => {
@@ -376,13 +417,69 @@ describe("financeApi - members", () => {
       color: "#ff0000",
       built_in: false,
     });
-    expect(result).toEqual({ id: "m1", name: "Ayah", color: "#ff0000", builtIn: false, familyId: "fam1" });
+    expect(result).toEqual(expect.objectContaining({ id: "m1", name: "Ayah", builtIn: false, familyId: "fam1" }));
   });
 
   it("deleteMemberById deletes the member by id", async () => {
     setupChain({ data: null, error: null });
     await deleteMemberById("m1");
     expect(supabase.eq).toHaveBeenCalledWith("id", "m1");
+  });
+
+  it("linkMemberToAccount calls link_member_to_account rpc", async () => {
+    setupChain({ data: null, error: null });
+    await linkMemberToAccount("m1");
+    expect(supabase.rpc).toHaveBeenCalledWith("link_member_to_account", { target_member_id: "m1" });
+  });
+
+  it("unlinkMemberFromAccount calls unlink_member_from_account rpc", async () => {
+    setupChain({ data: null, error: null });
+    await unlinkMemberFromAccount("m1");
+    expect(supabase.rpc).toHaveBeenCalledWith("unlink_member_from_account", { target_member_id: "m1" });
+  });
+});
+
+describe("financeApi - profile avatars", () => {
+  const dataUrl = "data:image/jpeg;base64," + btoa("fake-jpeg-bytes");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uploadProfileAvatar uploads to the avatars bucket and returns the public url", async () => {
+    const url = await uploadProfileAvatar("u1", dataUrl);
+    expect(supabase.storage.from).toHaveBeenCalledWith("avatars");
+    expect(supabase.storage.upload).toHaveBeenCalledWith("u1/avatar.jpg", expect.any(Blob), {
+      contentType: "image/jpeg",
+      upsert: true,
+    });
+    expect(url).toContain("/storage/v1/object/public/avatars/u1/avatar.jpg");
+  });
+
+  it("uploadProfileAvatar uploads only the cropped bytes, not the whole data url", async () => {
+    await uploadProfileAvatar("u1", dataUrl);
+    const [, blob] = supabase.storage.upload.mock.calls[0];
+    // Penting: blob-nya harus berisi bytes gambar saja, bukan data URL 60-120 KB.
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.size).toBe("fake-jpeg-bytes".length);
+    expect(blob.type).toBe("image/jpeg");
+  });
+
+  it("uploadProfileAvatar rejects a malformed data url", async () => {
+    await expect(uploadProfileAvatar("u1", "not-a-data-url")).rejects.toThrow("Gambar tidak valid");
+    expect(supabase.storage.upload).not.toHaveBeenCalled();
+  });
+
+  it("uploadProfileAvatar surfaces upload failures", async () => {
+    supabase.storage.upload.mockResolvedValueOnce({ data: null, error: new Error("quota") });
+    await expect(uploadProfileAvatar("u1", dataUrl)).rejects.toThrow("quota");
+    expect(supabase.storage.getPublicUrl).not.toHaveBeenCalled();
+  });
+
+  it("deleteProfileAvatar removes the user object", async () => {
+    await deleteProfileAvatar("u1");
+    expect(supabase.storage.from).toHaveBeenCalledWith("avatars");
+    expect(supabase.storage.remove).toHaveBeenCalledWith(["u1/avatar.jpg"]);
   });
 });
 
