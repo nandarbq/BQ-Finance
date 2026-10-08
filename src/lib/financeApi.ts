@@ -238,7 +238,9 @@ export async function uploadProfileAvatar(userId: string, dataUrl: string): Prom
   if (error) throw error;
   const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path);
   if (!data?.publicUrl) throw new Error("Gagal membuat URL foto profil");
-  return data.publicUrl;
+  // Path object selalu sama (${userId}/avatar.jpg); tanpa versi, browser/CDN
+  // menghidangkan foto lama dari cache walau isi object sudah berganti.
+  return data.publicUrl + "?v=" + Date.now();
 }
 
 export async function deleteProfileAvatar(userId: string): Promise<void> {

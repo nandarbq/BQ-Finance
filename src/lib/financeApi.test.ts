@@ -468,6 +468,12 @@ describe("financeApi - profile avatars", () => {
     expect(url).toContain("/storage/v1/object/public/avatars/u1/avatar.jpg");
   });
 
+  it("uploadProfileAvatar cache-busts the url so browsers never show a stale photo", async () => {
+    const url = await uploadProfileAvatar("u1", dataUrl);
+    // Path object selalu sama; tanpa versi, cache browser/CDN menampilkan foto lama.
+    expect(url).toMatch(/\?v=\d+$/);
+  });
+
   it("uploadProfileAvatar uploads only the cropped bytes, not the whole data url", async () => {
     await uploadProfileAvatar("u1", dataUrl);
     const [, blob] = supabase.storage.upload.mock.calls[0];
