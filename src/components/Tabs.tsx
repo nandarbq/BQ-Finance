@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type { FamilyState, Mode, Transaction, Member, Budget, Category, TabId } from "../lib/types";
 import {
@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "./Toast";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RTooltip, BarChart, Bar, XAxis, YAxis } from "recharts";
-import { exportTransactionPdf } from "../lib/exportPdf";
+import { exportTransactionPdf, savePdfDownload } from "../lib/exportPdf";
 import { formatRupiah } from "../lib/format";
 import {
   monthKeyFor,
@@ -473,7 +473,16 @@ function TabTransaksi({
   const [query, setQuery] = useState("");
   const [exporting, setExporting] = useState(false);
   const [rangeSheetOpen, setRangeSheetOpen] = useState(false);
+  const [savedPdf, setSavedPdf] = useState<{ url: string; fileName: string } | null>(null);
+  const savedPdfUrlRef = useRef<string | null>(null);
   const debouncedQuery = useDebouncedValue(query, 250);
+
+  // Cabut object URL saat komponen dilepas (ganti tab) agar tidak bocor.
+  useEffect(() => {
+    return () => {
+      if (savedPdfUrlRef.current) URL.revokeObjectURL(savedPdfUrlRef.current);
+    };
+  }, []);
 
   const periodRange = useMemo(() => {
     if (period === "month") return monthRange(0);
@@ -537,7 +546,7 @@ function TabTransaksi({
     const id = toast.loading("Membuat PDF...");
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      await Promise.race([
+      const { blob, fileName } = await Promise.race([
         exportTransactionPdf({
           transactions: filtered,
           members,
@@ -548,18 +557,36 @@ function TabTransaksi({
           filterType: filter,
           searchQuery: query,
         }),
-        new Promise((_, reject) => {
+        new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error("timeout")), 20000);
         }),
       ]);
       clearTimeout(timeoutId);
-      toast.resolve(id, "success", "PDF berhasil diunduh");
+      const { status, url } = await savePdfDownload(blob, fileName);
+      toast.dismiss(id);
+      if (status !== "cancelled" && url) {
+        if (savedPdfUrlRef.current) URL.revokeObjectURL(savedPdfUrlRef.current);
+        savedPdfUrlRef.current = url;
+        setSavedPdf({ url, fileName });
+      }
     } catch {
       clearTimeout(timeoutId);
       toast.resolve(id, "error", "Gagal membuat PDF. Coba lagi.");
     } finally {
       setExporting(false);
     }
+  }
+
+  function closeSavedPdf() {
+    if (savedPdfUrlRef.current) {
+      URL.revokeObjectURL(savedPdfUrlRef.current);
+      savedPdfUrlRef.current = null;
+    }
+    setSavedPdf(null);
+  }
+
+  function openSavedPdf() {
+    if (savedPdfUrlRef.current) window.open(savedPdfUrlRef.current, "_blank");
   }
 
   return (
@@ -838,6 +865,57 @@ function TabTransaksi({
             </div>
           </div>
         ))
+      )}
+
+      {savedPdf && (
+        <div className="fixed inset-0 flex flex-col justify-end" style={{ zIndex: 900 }}>
+          <div
+            className="absolute inset-0 bqfinance-fade-in"
+            style={{ background: "rgba(5,10,8,0.6)" }}
+            onClick={closeSavedPdf}
+          />
+          <div
+            className="relative bqfinance-sheet-up rounded-t-3xl px-4 pt-5 pb-6"
+            style={{ background: "var(--bg-surface)", boxShadow: "0 -10px 40px rgba(0,0,0,0.4)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="PDF berhasil diunduh"
+          >
+            <div className="flex flex-col items-center text-center">
+              <div
+                className="flex items-center justify-center rounded-full mb-3"
+                style={{ width: 48, height: 48, background: "var(--bg-muted)" }}
+              >
+                <Check size={22} color="var(--positive)" />
+              </div>
+              <p style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 700 }}>PDF berhasil diunduh</p>
+              <p
+                className="mt-1 w-full truncate"
+                style={{ color: "var(--text-muted)", fontSize: 11.5 }}
+                title={savedPdf.fileName}
+              >
+                {savedPdf.fileName}
+              </p>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={closeSavedPdf}
+                className="flex-1 py-2.5 rounded-xl"
+                style={{ background: "var(--bg-muted)", color: "var(--text-secondary)", fontSize: 12.5, fontWeight: 600 }}
+              >
+                Selesai
+              </button>
+              <button
+                onClick={openSavedPdf}
+                className="flex-1 py-2.5 rounded-xl flex items-center justify-center gap-1.5"
+                style={{ background: "var(--blue)", color: "var(--bg-app)", fontSize: 12.5, fontWeight: 700 }}
+              >
+                <Eye size={14} />
+                Buka file
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -82,7 +82,7 @@ export async function exportTransactionPdf({
   categories?: Category[];
   filterType?: "all" | "in" | "out";
   searchQuery?: string;
-}): Promise<void> {
+}): Promise<{ blob: Blob; fileName: string }> {
   // Salinan terurut naik: tanggal paling awal lebih dulu. Urutan tampilan di
   // layar (terbaru di atas) tidak diubah.
   const rows = sortChronological(transactions);
@@ -397,15 +397,82 @@ export async function exportTransactionPdf({
       .toLowerCase()
       .trim()
       .replace(/^-+|-+$/g, "") || "periode";
-  const fileName = "Laporan-Transaksi-" + safeName + ".pdf";
 
-  const blob = doc.output("blob");
+  // Stempel waktu saat unduhan diminta: tanggal + jam supaya dua export di
+  // hari yang sama tidak pernah bernama sama (Chrome memunculkan prompt
+  // "Unduh file lagi?" untuk nama file duplikat).
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const downloadedAt = new Date();
+  const stamp =
+    pad(downloadedAt.getDate()) +
+    "-" +
+    pad(downloadedAt.getMonth() + 1) +
+    "-" +
+    downloadedAt.getFullYear() +
+    "-" +
+    pad(downloadedAt.getHours()) +
+    pad(downloadedAt.getMinutes()) +
+    pad(downloadedAt.getSeconds());
+  const fileName = "Laporan-Transaksi-" + safeName + "-" + stamp + ".pdf";
+
+  return { blob: doc.output("blob"), fileName };
+}
+
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options?: {
+    suggestedName?: string;
+    types?: { description?: string; accept?: Record<string, string[]> }[];
+  }) => Promise<{
+    createWritable: () => Promise<{
+      write: (data: Blob) => Promise<void>;
+      close: () => Promise<void>;
+    }>;
+  }>;
+};
+
+export type SavePdfResult = {
+  /** "saved": sudah tertulis ke disk; "started": unduhan dimulai; "cancelled": dibatalkan. */
+  status: "saved" | "started" | "cancelled";
+  /** Object URL PDF — dipakai tombol "Buka file"; wajib di-revoke saat sudah tidak dipakai. */
+  url: string | null;
+};
+
+/**
+ * Simpan PDF ke perangkat.
+ * - Chromium (showSaveFilePicker): tulis langsung ke file — status "saved"
+ *   hanya dikembalikan setelah write/close selesai, jadi benar-benar sudah
+ *   tersimpan di disk. User membatalkan picker -> "cancelled".
+ * - Browser lain / picker gagal (mis. user activation habis): unduh via
+ *   anchor — web tidak punya event "unduhan selesai", jadi "started".
+ */
+export async function savePdfDownload(blob: Blob, fileName: string): Promise<SavePdfResult> {
   const url = URL.createObjectURL(blob);
+  const win = window as SaveFilePickerWindow;
+
+  if (typeof win.showSaveFilePicker === "function") {
+    try {
+      const handle = await win.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{ description: "PDF", accept: { "application/pdf": [".pdf"] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return { status: "saved", url };
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        URL.revokeObjectURL(url);
+        return { status: "cancelled", url: null };
+      }
+      // SecurityError (user activation habis) dll: jatuh ke unduhan biasa.
+    }
+  }
+
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return { status: "started", url };
 }
