@@ -20,7 +20,7 @@ import { todayISO, formatDateShort, nameFromEmail, memberLabelName } from "../li
 import { formatRupiah } from "../lib/format";
 import { getCatMeta } from "../lib/categoryMeta";
 import type { Category, FamilyState, Member, Transaction } from "../lib/types";
-import { Avatar, ProfileAvatar } from "./ui";
+import { Avatar, ProfileAvatar, FamilyGroupIcon } from "./ui";
 
 interface CropSheetProps {
   src: string;
@@ -382,7 +382,14 @@ function TxDetailSheet({ tx, members, family, onClose, onEdit, onDelete, categor
             >
               <span style={{ color: "var(--text-muted)", fontSize: 11.5 }}>Anggota</span>
               <span className="flex items-center gap-1.5">
-                <Avatar name={memberLabelName(member)} color={member.color} size={18} src={member.avatarUrl} innerId={"mem-" + member.id} />
+                <Avatar
+                  name={memberLabelName(member)}
+                  color={member.color}
+                  size={18}
+                  src={member.avatarUrl}
+                  innerId={"mem-" + member.id}
+                  icon={member.builtIn ? FamilyGroupIcon : undefined}
+                />
                 <span style={{ color: "var(--text-primary)", fontSize: 12, fontWeight: 600 }}>{memberLabelName(member)}</span>
               </span>
             </div>

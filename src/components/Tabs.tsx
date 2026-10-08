@@ -55,7 +55,7 @@ import {
   memberLabelName,
 } from "../lib/appUtils";
 import { getCatMeta, ICON_MAP, MEMBER_COLORS } from "../lib/categoryMeta";
-import { Avatar, EmptyState, ProfileAvatar } from "./ui";
+import { Avatar, EmptyState, ProfileAvatar, FamilyGroupIcon } from "./ui";
 import { CalendarSheet } from "./Sheets";
 
 interface TabBerandaProps {
@@ -2029,7 +2029,14 @@ function TabPengaturan({
               return (
                 <div key={m.id}>
                   <div className="flex items-center gap-2.5">
-                    <Avatar name={memberLabelName(m)} color={m.color} size={30} src={m.avatarUrl} innerId={"mem-" + m.id} />
+                    <Avatar
+                      name={memberLabelName(m)}
+                      color={m.color}
+                      size={30}
+                      src={m.avatarUrl}
+                      innerId={"mem-" + m.id}
+                      icon={m.builtIn ? FamilyGroupIcon : undefined}
+                    />
                     <div className="flex-1 min-w-0">
                       <p
                         style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }}

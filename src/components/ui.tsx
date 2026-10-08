@@ -1,6 +1,22 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ComponentType } from "react";
 import type { LucideIcon } from "lucide-react";
 import defaultRobotAvatar from "../assets/avatar robot bq finance.png";
+
+/**
+ * Siluet keluarga: dua orang dewasa + satu anak berdampingan.
+ * Ikon kustom (lucide tidak punya ikon keluarga) dengan gaya serupa:
+ * viewBox 24x24, warna ikut `color`, dipakai untuk label built-in "Bersama".
+ */
+const FamilyGroupIcon: ComponentType<{ size?: number; color?: string }> = ({ size = 24, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true" focusable="false">
+    <circle cx="4.5" cy="6.8" r="2.6" />
+    <rect x="1.4" y="10" width="6.2" height="11" rx="3.1" />
+    <circle cx="12" cy="10" r="2.15" />
+    <rect x="9.4" y="12.6" width="5.2" height="8.4" rx="2.6" />
+    <circle cx="19.5" cy="6.8" r="2.6" />
+    <rect x="16.4" y="10" width="6.2" height="11" rx="3.1" />
+  </svg>
+);
 
 interface AvatarProps {
   name: string;
@@ -10,9 +26,11 @@ interface AvatarProps {
   /** URL foto profil. Kalau ada, tampil foto; kalau tidak, tetap inisial. */
   src?: string | null;
   innerId?: string;
+  /** Ikon pengganti inisial (mis. FamilyGroupIcon untuk label "Bersama"). */
+  icon?: ComponentType<{ size?: number; color?: string }>;
 }
 
-function Avatar({ name, color, size = 32, ring = false, src, innerId }: AvatarProps) {
+function Avatar({ name, color, size = 32, ring = false, src, innerId, icon }: AvatarProps) {
   const base: CSSProperties = {
     width: size,
     height: size,
@@ -33,16 +51,29 @@ function Avatar({ name, color, size = 32, ring = false, src, innerId }: AvatarPr
     );
   }
 
+  const circle: CSSProperties = {
+    ...base,
+    background: color,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "var(--bg-app)",
+  };
+
+  if (icon) {
+    const Icon = icon;
+    return (
+      <div style={circle} role="img" aria-label={name || "Label anggota"}>
+        <Icon size={Math.round(size * 0.5)} color="var(--bg-app)" />
+      </div>
+    );
+  }
+
   const initial = (name || "?").trim().charAt(0).toUpperCase();
   return (
     <div
       style={{
-        ...base,
-        background: color,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "var(--bg-app)",
+        ...circle,
         fontWeight: 700,
         fontSize: size * 0.42,
         fontFamily: "'Sora', sans-serif",
@@ -156,4 +187,4 @@ function LoadingSkeleton() {
   );
 }
 
-export { Avatar, EmptyState, ProfileAvatar, SkeletonBlock, LoadingSkeleton };
+export { Avatar, EmptyState, ProfileAvatar, SkeletonBlock, LoadingSkeleton, FamilyGroupIcon };

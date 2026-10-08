@@ -4,7 +4,7 @@ import { X, Pencil, Plus, MoreHorizontal, Trash2, Check, Calendar, GripVertical 
 import { todayISO, formatDateShort, memberLabelName } from "../lib/appUtils";
 import { ICON_MAP, CATEGORY_COLORS } from "../lib/categoryMeta";
 import type { Category, CategoryDraft, Member, Mode, Transaction, TransactionDraft, TxType } from "../lib/types";
-import { Avatar } from "./ui";
+import { Avatar, FamilyGroupIcon } from "./ui";
 import { CalendarSheet } from "./Sheets";
 
 interface CategoryForm {
@@ -700,7 +700,15 @@ function QuickAddSheet({
                   onClick={() => setMemberId(m.id)}
                   className="flex flex-col items-center gap-1.5 flex-shrink-0"
                 >
-                  <Avatar name={memberLabelName(m)} color={m.color} size={34} ring={memberId === m.id} src={m.avatarUrl} innerId={"mem-" + m.id} />
+                  <Avatar
+                    name={memberLabelName(m)}
+                    color={m.color}
+                    size={34}
+                    ring={memberId === m.id}
+                    src={m.avatarUrl}
+                    innerId={"mem-" + m.id}
+                    icon={m.builtIn ? FamilyGroupIcon : undefined}
+                  />
                   <span
                     className="truncate"
                     style={{
