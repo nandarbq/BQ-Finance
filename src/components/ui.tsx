@@ -3,18 +3,20 @@ import type { LucideIcon } from "lucide-react";
 import defaultRobotAvatar from "../assets/avatar robot bq finance.png";
 
 /**
- * Siluet keluarga: dua orang dewasa + satu anak berdampingan.
- * Ikon kustom (lucide tidak punya ikon keluarga) dengan gaya serupa:
- * viewBox 24x24, warna ikut `color`, dipakai untuk label built-in "Bersama".
+ * Ikon kustom label built-in "Bersama": ayah, ibu bergaun, dan anak di tengah
+ * yang saling menggenggam tangan — simbol keluarga. Lucide tidak punya ikon
+ * keluarga; dibuat gaya serupa (viewBox 24x24, isi `fill` mengikuti `color`).
  */
 const FamilyGroupIcon: ComponentType<{ size?: number; color?: string }> = ({ size = 24, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={color} aria-hidden="true" focusable="false">
-    <circle cx="4.5" cy="6.8" r="2.6" />
-    <rect x="1.4" y="10" width="6.2" height="11" rx="3.1" />
-    <circle cx="12" cy="10" r="2.15" />
-    <rect x="9.4" y="12.6" width="5.2" height="8.4" rx="2.6" />
-    <circle cx="19.5" cy="6.8" r="2.6" />
-    <rect x="16.4" y="10" width="6.2" height="11" rx="3.1" />
+    <circle cx="5" cy="6" r="2.5" />
+    <path d="M1.6 22v-7.6c0-3.6 1.5-6.4 3.4-6.4s3.4 2.8 3.4 6.4V22H1.6z" />
+    <circle cx="12" cy="10.4" r="2.1" />
+    <path d="M9.7 22v-5.3c0-2.9 1-5.1 2.3-5.1s2.3 2.2 2.3 5.1V22H9.7z" />
+    <circle cx="20" cy="6.4" r="2.5" />
+    <path d="M16.8 22l.8-8.6c.3-2.6 1.2-4.8 2.4-4.8s2.1 2.2 2.4 4.8l.8 8.6h-6.4z" />
+    <rect x="7.7" y="13.6" width="2.9" height="1.7" rx=".85" />
+    <rect x="13.7" y="13.6" width="4" height="1.7" rx=".85" />
   </svg>
 );
 
