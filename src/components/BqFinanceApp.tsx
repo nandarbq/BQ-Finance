@@ -617,15 +617,18 @@ export default function BqFinanceApp({ session }: BqFinanceAppProps) {
     [members]
   );
 
-  const handleLinkMember = useCallback(async (id: string) => {
-    try {
-      await linkMemberToAccount(id);
-      await refreshMemberLabels();
-      toast.success("Anggota ditautkan ke akunmu.");
-    } catch {
-      toast.error("Gagal menautkan anggota. Coba lagi.");
-    }
-  }, [refreshMemberLabels]);
+  const handleLinkMember = useCallback(
+    async (id: string, targetUserId?: string) => {
+      try {
+        await linkMemberToAccount(id, targetUserId);
+        await refreshMemberLabels();
+        toast.success(targetUserId && targetUserId !== userId ? "Tautan anggota diperbarui." : "Anggota ditautkan ke akunmu.");
+      } catch {
+        toast.error("Gagal menautkan anggota. Coba lagi.");
+      }
+    },
+    [refreshMemberLabels, userId]
+  );
 
   const handleUnlinkMember = useCallback(async (id: string) => {
     try {

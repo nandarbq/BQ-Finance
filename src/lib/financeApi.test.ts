@@ -429,7 +429,19 @@ describe("financeApi - members", () => {
   it("linkMemberToAccount calls link_member_to_account rpc", async () => {
     setupChain({ data: null, error: null });
     await linkMemberToAccount("m1");
-    expect(supabase.rpc).toHaveBeenCalledWith("link_member_to_account", { target_member_id: "m1" });
+    expect(supabase.rpc).toHaveBeenCalledWith("link_member_to_account", {
+      target_member_id: "m1",
+      target_user_id: null,
+    });
+  });
+
+  it("linkMemberToAccount passes target user for head-of-family linking", async () => {
+    setupChain({ data: null, error: null });
+    await linkMemberToAccount("m1", "u2");
+    expect(supabase.rpc).toHaveBeenCalledWith("link_member_to_account", {
+      target_member_id: "m1",
+      target_user_id: "u2",
+    });
   });
 
   it("unlinkMemberFromAccount calls unlink_member_from_account rpc", async () => {

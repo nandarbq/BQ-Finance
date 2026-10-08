@@ -248,8 +248,11 @@ export async function deleteProfileAvatar(userId: string): Promise<void> {
 
 /* ================================ Member account linking ================================ */
 
-export async function linkMemberToAccount(memberId: string): Promise<void> {
-  const { error } = await supabase.rpc("link_member_to_account", { target_member_id: memberId });
+export async function linkMemberToAccount(memberId: string, targetUserId?: string): Promise<void> {
+  const { error } = await supabase.rpc("link_member_to_account", {
+    target_member_id: memberId,
+    target_user_id: targetUserId ?? null,
+  });
   if (error) throw error;
 }
 

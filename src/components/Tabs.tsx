@@ -1113,7 +1113,7 @@ interface TabPengaturanProps {
   onLeaveFamily: () => void | Promise<void>;
   onRemoveMember: (userId: string) => void | Promise<void>;
   onRefreshFamily: () => void | Promise<void>;
-  onLinkMember: (id: string) => void | Promise<void>;
+  onLinkMember: (id: string, targetUserId?: string) => void | Promise<void>;
   onUnlinkMember: (id: string) => void | Promise<void>;
 }
 
@@ -1165,11 +1165,12 @@ function TabPengaturan({
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [familyRefreshing, setFamilyRefreshing] = useState(false);
   const [linkingMemberId, setLinkingMemberId] = useState<string | null>(null);
+  const [linkPickerMemberId, setLinkPickerMemberId] = useState<string | null>(null);
 
-  async function handleLink(m: Member) {
+  async function handleLink(m: Member, targetUserId?: string) {
     setLinkingMemberId(m.id);
     try {
-      await onLinkMember(m.id);
+      await onLinkMember(m.id, targetUserId);
     } finally {
       setLinkingMemberId(null);
     }
@@ -1194,6 +1195,7 @@ function TabPengaturan({
   );
 
   const isKepala = !!family?.members.find((m) => m.userId === userId && m.role === "kepala_keluarga");
+  const familyMembers = family?.members ?? [];
 
   function formatJoinCode(code: string | null): string {
     const c = (code || "").toUpperCase();
@@ -1857,14 +1859,16 @@ function TabPengaturan({
         <div className="rounded-2xl p-4 mb-4" style={{ background: "var(--bg-surface)" }}>
           <div className="flex items-center justify-between mb-2">
             <p style={{ color: "var(--text-primary)", fontWeight: 600, fontSize: 13.5 }}>Anggota keluarga</p>
-            <button
-              onClick={() => setShowAddMember((v) => !v)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full"
-              style={{ background: "var(--bg-muted)" }}
-            >
-              <UserPlus size={12} color="var(--blue)" />
-              <span style={{ color: "var(--blue)", fontSize: 10.5, fontWeight: 600 }}>Tambah</span>
-            </button>
+            {isKepala && (
+              <button
+                onClick={() => setShowAddMember((v) => !v)}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full"
+                style={{ background: "var(--bg-muted)" }}
+              >
+                <UserPlus size={12} color="var(--blue)" />
+                <span style={{ color: "var(--blue)", fontSize: 10.5, fontWeight: 600 }}>Tambah</span>
+              </button>
+            )}
           </div>
           {showAddMember && (
             <div className="rounded-xl p-3 mb-3" style={{ background: "var(--bg-muted)" }}>
@@ -1942,77 +1946,150 @@ function TabPengaturan({
               const linkedToMe = m.linkedUserId === userId;
               const linkedToOther = !!m.linkedUserId && !linkedToMe;
               const isLinking = linkingMemberId === m.id;
+              const pickerOpen = linkPickerMemberId === m.id;
               return (
-                <div key={m.id} className="flex items-center gap-2.5">
-                  <Avatar name={memberLabelName(m)} color={m.color} size={30} src={m.avatarUrl} innerId={"mem-" + m.id} />
-                  <div className="flex-1 min-w-0">
-                    <p
-                      style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }}
-                      className="truncate flex items-center gap-1.5"
-                    >
-                      <span className="truncate">{memberLabelName(m)}</span>
-                      {m.linkedUserId && (
-                        <span
-                          className="flex-shrink-0"
-                          style={{
-                            background: "var(--bg-muted)",
-                            color: "var(--text-muted)",
-                            fontSize: 9,
-                            fontWeight: 700,
-                            padding: "1px 5px",
-                            borderRadius: 999,
-                          }}
-                        >
-                          {linkedToMe ? "AKUNMU" : "TERTAUT"}
-                        </span>
-                      )}
-                    </p>
-                    <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Pengeluaran: {formatRupiah(m.spent)}</p>
-                  </div>
+                <div key={m.id}>
+                  <div className="flex items-center gap-2.5">
+                    <Avatar name={memberLabelName(m)} color={m.color} size={30} src={m.avatarUrl} innerId={"mem-" + m.id} />
+                    <div className="flex-1 min-w-0">
+                      <p
+                        style={{ color: "var(--text-primary)", fontSize: 12.5, fontWeight: 500 }}
+                        className="truncate flex items-center gap-1.5"
+                      >
+                        <span className="truncate">{memberLabelName(m)}</span>
+                        {m.linkedUserId && (
+                          <span
+                            className="flex-shrink-0"
+                            style={{
+                              background: "var(--bg-muted)",
+                              color: "var(--text-muted)",
+                              fontSize: 9,
+                              fontWeight: 700,
+                              padding: "1px 5px",
+                              borderRadius: 999,
+                            }}
+                          >
+                            {linkedToMe ? "AKUNMU" : "TERTAUT"}
+                          </span>
+                        )}
+                      </p>
+                      <p style={{ color: "var(--text-muted)", fontSize: 10.5 }}>Pengeluaran: {formatRupiah(m.spent)}</p>
+                    </div>
 
-                  {!m.builtIn && !linkedToOther && !isConfirmMember && (
-                    <button
-                      onClick={() => (linkedToMe ? handleUnlink(m) : handleLink(m))}
-                      disabled={isLinking}
-                      className="p-1.5 flex items-center"
-                      title={linkedToMe ? "Lepas dari akunmu" : "Tautkan ke akunmu"}
-                    >
-                      {isLinking ? (
-                        <Loader2 size={13} color="var(--text-faint)" className="animate-spin" />
-                      ) : (
-                        <Link2 size={13} color={linkedToMe ? "var(--blue)" : "var(--text-faint)"} />
-                      )}
-                    </button>
-                  )}
-                  {!m.builtIn && !isConfirmMember && (
-                    <button onClick={() => setConfirmMemberId(m.id)} className="p-1.5">
-                      <Trash2 size={13} color="var(--text-faint)" />
-                    </button>
-                  )}
-                  {!m.builtIn && isConfirmMember && (
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {!m.builtIn && !isConfirmMember && (isKepala || !linkedToOther) && (
                       <button
                         onClick={() => {
-                          onDeleteMember(m.id);
-                          setConfirmMemberId(null);
+                          if (isKepala) {
+                            setLinkPickerMemberId(pickerOpen ? null : m.id);
+                          } else if (linkedToMe) {
+                            handleUnlink(m);
+                          } else {
+                            handleLink(m);
+                          }
                         }}
-                        className="px-2 py-1 rounded-lg"
-                        style={{ background: "var(--negative)", color: "var(--bg-app)", fontSize: 10, fontWeight: 700 }}
+                        disabled={isLinking}
+                        className="p-1.5 flex items-center"
+                        title={
+                          isKepala
+                            ? "Kelola tautan akun"
+                            : linkedToMe
+                              ? "Lepas dari akunmu"
+                              : "Tautkan ke akunmu"
+                        }
                       >
-                        Hapus
+                        {isLinking ? (
+                          <Loader2 size={13} color="var(--text-faint)" className="animate-spin" />
+                        ) : (
+                          <Link2 size={13} color={linkedToMe ? "var(--blue)" : "var(--text-faint)"} />
+                        )}
                       </button>
-                      <button
-                        onClick={() => setConfirmMemberId(null)}
-                        className="px-2 py-1 rounded-lg"
-                        style={{
-                          background: "var(--bg-selected)",
-                          color: "var(--text-secondary)",
-                          fontSize: 10,
-                          fontWeight: 600,
-                        }}
+                    )}
+                    {isKepala && !m.builtIn && !isConfirmMember && (
+                      <button onClick={() => setConfirmMemberId(m.id)} className="p-1.5">
+                        <Trash2 size={13} color="var(--text-faint)" />
+                      </button>
+                    )}
+                    {isKepala && !m.builtIn && isConfirmMember && (
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            onDeleteMember(m.id);
+                            setConfirmMemberId(null);
+                          }}
+                          className="px-2 py-1 rounded-lg"
+                          style={{ background: "var(--negative)", color: "var(--bg-app)", fontSize: 10, fontWeight: 700 }}
+                        >
+                          Hapus
+                        </button>
+                        <button
+                          onClick={() => setConfirmMemberId(null)}
+                          className="px-2 py-1 rounded-lg"
+                          style={{
+                            background: "var(--bg-selected)",
+                            color: "var(--text-secondary)",
+                            fontSize: 10,
+                            fontWeight: 600,
+                          }}
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {pickerOpen && (
+                    <div className="rounded-xl p-2 mt-1.5" style={{ background: "var(--bg-muted)" }}>
+                      <p
+                        style={{ color: "var(--text-primary)", fontSize: 11, fontWeight: 600, padding: "2px 6px 6px" }}
                       >
-                        Batal
-                      </button>
+                        Tautkan &quot;{memberLabelName(m)}&quot; ke akun:
+                      </p>
+                      <div className="flex flex-col gap-0.5">
+                        {familyMembers.map((fm) => {
+                          const isMeTarget = fm.userId === userId;
+                          const targetName = isMeTarget
+                            ? displayName
+                            : fm.displayName || (fm.email ? nameFromEmail(fm.email) : "Anggota");
+                          const alreadyLinked = m.linkedUserId === fm.userId;
+                          return (
+                            <button
+                              key={fm.userId}
+                              onClick={() => {
+                                setLinkPickerMemberId(null);
+                                handleLink(m, fm.userId);
+                              }}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left w-full"
+                              style={{ background: alreadyLinked ? "var(--bg-selected)" : "transparent" }}
+                            >
+                              <ProfileAvatar avatar={fm.avatarUrl} size={22} innerId={"lp-" + fm.userId} />
+                              <span className="flex-1 min-w-0 truncate" style={{ color: "var(--text-primary)", fontSize: 12 }}>
+                                {targetName}
+                                {isMeTarget ? " (Kamu)" : ""}
+                              </span>
+                              {fm.role === "kepala_keluarga" && <Crown size={11} color="#f5b50a" />}
+                              {alreadyLinked && <Link2 size={11} color="var(--blue)" />}
+                            </button>
+                          );
+                        })}
+                        {m.linkedUserId && (
+                          <button
+                            onClick={() => {
+                              setLinkPickerMemberId(null);
+                              handleUnlink(m);
+                            }}
+                            className="px-2 py-1.5 rounded-lg text-left w-full"
+                            style={{ color: "var(--negative)", fontSize: 11.5, fontWeight: 600 }}
+                          >
+                            Lepas tautan
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setLinkPickerMemberId(null)}
+                          className="px-2 py-1.5 rounded-lg text-left w-full"
+                          style={{ color: "var(--text-muted)", fontSize: 11.5, fontWeight: 600 }}
+                        >
+                          Batal
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
