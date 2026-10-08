@@ -7,6 +7,7 @@
 --   2. Anggota biasa hanya bisa menautkan/melepas tautan ke akunnya sendiri.
 --   3. Kepala keluarga bisa menautkan label ke akun anggota mana pun
 --      (pilih tujuan) dan melepas tautan label siapa pun di keluarganya.
+--   4. Satu akun hanya boleh tertaut di satu label (anti tautan ganda).
 
 -- =========================================================
 -- 1. Helper: apakah pemanggil kepala keluarga family ini?
@@ -95,6 +96,16 @@ begin
   -- Tautkan ke akun orang lain: hanya kepala keluarga.
   if link_target <> me and fm.role <> 'kepala_keluarga' then
     raise exception 'Hanya kepala keluarga yang bisa menautkan anggota ke akun lain.';
+  end if;
+
+  -- Satu akun hanya boleh menempel di satu label (anti tautan ganda).
+  if exists (
+    select 1 from members m2
+     where m2.family_id = fm.family_id
+       and m2.linked_user_id = link_target
+       and m2.id <> target_member_id
+  ) then
+    raise exception 'Akun sudah ditautkan ke label lain. Lepas tautannya dulu.';
   end if;
 
   -- Anggota biasa menautkan ke akun sendiri: hanya label kosong / miliknya.

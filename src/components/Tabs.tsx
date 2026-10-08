@@ -2023,6 +2023,7 @@ function TabPengaturan({
               const isConfirmMember = confirmMemberId === m.id;
               const linkedToMe = m.linkedUserId === userId;
               const linkedToOther = !!m.linkedUserId && !linkedToMe;
+              const meLinkedElsewhere = memberTotals.some((x) => x.linkedUserId === userId && x.id !== m.id);
               const isLinking = linkingMemberId === m.id;
               const pickerOpen = linkPickerMemberId === m.id;
               return (
@@ -2065,15 +2066,18 @@ function TabPengaturan({
                             handleLink(m);
                           }
                         }}
-                        disabled={isLinking}
+                        disabled={isLinking || (!isKepala && !linkedToMe && meLinkedElsewhere)}
                         className="p-1.5 flex items-center"
                         title={
                           isKepala
                             ? "Kelola tautan akun"
                             : linkedToMe
                               ? "Lepas dari akunmu"
-                              : "Tautkan ke akunmu"
+                              : meLinkedElsewhere
+                                ? "Akunmu sudah tertaut ke label lain"
+                                : "Tautkan ke akunmu"
                         }
+                        style={{ opacity: !isKepala && !linkedToMe && meLinkedElsewhere ? 0.45 : 1 }}
                       >
                         {isLinking ? (
                           <Loader2 size={13} color="var(--text-faint)" className="animate-spin" />
@@ -2128,15 +2132,23 @@ function TabPengaturan({
                             ? displayName
                             : fm.displayName || (fm.email ? nameFromEmail(fm.email) : "Anggota");
                           const alreadyLinked = m.linkedUserId === fm.userId;
+                          const takenByOther = memberTotals.some((x) => x.linkedUserId === fm.userId && x.id !== m.id);
                           return (
                             <button
                               key={fm.userId}
                               onClick={() => {
+                                if (takenByOther) return;
                                 setLinkPickerMemberId(null);
                                 handleLink(m, fm.userId);
                               }}
+                              disabled={takenByOther}
+                              title={takenByOther ? "Sudah tertaut ke label lain" : undefined}
                               className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left w-full"
-                              style={{ background: alreadyLinked ? "var(--bg-selected)" : "transparent" }}
+                              style={{
+                                background: alreadyLinked ? "var(--bg-selected)" : "transparent",
+                                opacity: takenByOther ? 0.45 : 1,
+                                cursor: takenByOther ? "default" : "pointer",
+                              }}
                             >
                               <ProfileAvatar avatar={fm.avatarUrl} size={22} innerId={"lp-" + fm.userId} />
                               <span className="flex-1 min-w-0 truncate" style={{ color: "var(--text-primary)", fontSize: 12 }}>
@@ -2144,7 +2156,23 @@ function TabPengaturan({
                                 {isMeTarget ? " (Kamu)" : ""}
                               </span>
                               {fm.role === "kepala_keluarga" && <Crown size={11} color="#f5b50a" />}
-                              {alreadyLinked && <Link2 size={11} color="var(--blue)" />}
+                              {takenByOther ? (
+                                <span
+                                  className="flex-shrink-0"
+                                  style={{
+                                    background: "var(--bg-app)",
+                                    color: "var(--text-muted)",
+                                    fontSize: 8.5,
+                                    fontWeight: 700,
+                                    padding: "1px 5px",
+                                    borderRadius: 999,
+                                  }}
+                                >
+                                  TERPAKAI
+                                </span>
+                              ) : (
+                                alreadyLinked && <Link2 size={11} color="var(--blue)" />
+                              )}
                             </button>
                           );
                         })}
