@@ -753,7 +753,7 @@ describe("financeApi - categories", () => {
     setupChain({ data: { ...catRow, label: "Kuliner", icon: "Car", color: "#000000" }, error: null });
     await updateCategory("c1", { label: "Kuliner", icon: "Car", color: "#000000" });
 
-    expect(supabase.update).toHaveBeenCalledWith({ label: "Kuliner", icon: "Car", color: "#000000" });
+    expect(supabase.update).toHaveBeenCalledWith({ label: "Kuliner", icon: "Car", color: "#000000", is_default: false });
     expect(supabase.eq).toHaveBeenCalledWith("id", "c1");
   });
 

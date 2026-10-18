@@ -496,16 +496,18 @@ export async function fetchCategories(): Promise<Category[]> {
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = (data || []).map(rowToCategory);
-  await seedCategories(rows, DEFAULT_CATEGORIES, null);
-  const { data: seeded, error: fetchError } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("user_id", userId)
-    .is("family_id", null)
-    .order("sort_order", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true });
-  if (fetchError) throw fetchError;
-  return dedupeCategories((seeded || []).map(rowToCategory));
+  if (rows.length === 0) {
+    await seedCategories([], DEFAULT_CATEGORIES, null);
+    const { data: seeded, error: fetchError } = await supabase
+      .from("categories")
+      .select("*")
+      .eq("user_id", userId)
+      .is("family_id", null)
+      .order("created_at", { ascending: true });
+    if (fetchError) throw fetchError;
+    return dedupeCategories((seeded || []).map(rowToCategory));
+  }
+  return dedupeCategories(rows);
 }
 
 export async function fetchFamilyCategories(familyId: string): Promise<Category[]> {
@@ -517,15 +519,17 @@ export async function fetchFamilyCategories(familyId: string): Promise<Category[
     .order("created_at", { ascending: true });
   if (error) throw error;
   const rows = (data || []).map(rowToCategory);
-  await seedCategories(rows, DEFAULT_CATEGORIES, familyId);
-  const { data: seeded, error: fetchError } = await supabase
-    .from("categories")
-    .select("*")
-    .eq("family_id", familyId)
-    .order("sort_order", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true });
-  if (fetchError) throw fetchError;
-  return dedupeCategories((seeded || []).map(rowToCategory));
+  if (rows.length === 0) {
+    await seedCategories([], DEFAULT_CATEGORIES, familyId);
+    const { data: seeded, error: fetchError } = await supabase
+      .from("categories")
+      .select("*")
+      .eq("family_id", familyId)
+      .order("created_at", { ascending: true });
+    if (fetchError) throw fetchError;
+    return dedupeCategories((seeded || []).map(rowToCategory));
+  }
+  return dedupeCategories(rows);
 }
 
 export async function insertCategory(
@@ -580,7 +584,12 @@ export async function updateCategory(
 ): Promise<Category> {
   const { data, error } = await supabase
     .from("categories")
-    .update({ label: fields.label, icon: fields.icon, color: fields.color })
+    .update({
+      label: fields.label.trim(),
+      icon: fields.icon,
+      color: fields.color,
+      is_default: false,
+    })
     .eq("id", id)
     .select()
     .single();
